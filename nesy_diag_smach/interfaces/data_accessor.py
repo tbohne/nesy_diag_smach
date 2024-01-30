@@ -5,8 +5,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from vehicle_diag_smach.data_types.fault_context import FaultContext
-from vehicle_diag_smach.data_types.sensor_data import SensorData
+from nesy_diag_smach.data_types.fault_context import FaultContext
+from nesy_diag_smach.data_types.sensor_data import SensorData
 
 
 class DataAccessor(ABC):

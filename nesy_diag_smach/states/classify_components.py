@@ -8,7 +8,7 @@ from typing import List, Dict, Tuple
 
 import numpy as np
 import smach
-from nesy_ontology import ontology_instance_generator
+from nesy_diag_ontology import ontology_instance_generator
 from oscillogram_classification import cam
 from termcolor import colored
 

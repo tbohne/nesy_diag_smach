@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @author Tim Bohne
+
+from typing import List
+
+from oscillogram_classification import preprocess
+
+from nesy_diag_smach.config import SESSION_DIR
+from nesy_diag_smach.config import SIGNAL_SESSION_FILES
+from nesy_diag_smach.data_types.fault_context import FaultContext
+from nesy_diag_smach.data_types.sensor_data import SensorData
+from nesy_diag_smach.interfaces.data_accessor import DataAccessor
+
+
+class LocalDataAccessor(DataAccessor):
+    """
+    Implementation of the data accessor interface using local files.
+    """
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_fault_context() -> FaultContext:
+        """
+        Retrieves the fault context data required in the diagnostic process.
+
+        :return: fault context data
+        """
+        val = None
+        while val != "":
+            val = input("\nlocal interface impl.: sim processing fault context data..")
+        fault_context = FaultContext(['E12345'], "1234567890ABCDEFGHJKLMNPRSTUVWXYZ")
+        print(fault_context)
+        return fault_context
+
+    @staticmethod
+    def get_signals_by_components(components: List[str]) -> List[SensorData]:
+        """
+        Retrieves the sensor data for the specified components.
+
+        :param components: components to retrieve sensor data for
+        :return: sensor data for each component
+        """
+        val = None
+        while val != "":
+            val = input("\nlocal interface impl.: sim human - press 'ENTER' when the recording phase is finished"
+                        + " and the signals are generated for " + str(components))
+        signals = []
+        for comp in components:
+            path = SESSION_DIR + "/" + SIGNAL_SESSION_FILES + "/" + comp + ".csv"
+            _, values = preprocess.read_oscilloscope_recording(path)
+            signals.append(SensorData(values, comp))
+        return signals
+
+    def get_manual_judgement_for_component(self, component: str) -> bool:
+        """
+        Retrieves a manual judgement by the human for the specified component.
+
+        :param component: component to get manual judgement for
+        :return: true -> anomaly, false -> regular
+        """
+        print("local interface impl.: manual inspection of component:", component)
+        val = ""
+        while val not in ['0', '1']:
+            val = input("\nsim human - press '0' for defective component, i.e., anomaly, and '1' for no defect..")
+        return val == "0"
+
+    def get_manual_judgement_for_sensor(self) -> bool:
+        """
+        Retrieves a manual judgement by the human for the currently considered sensor.
+
+        :return: true -> anomaly, false -> regular
+        """
+        print("no anomaly identified -- check potential sensor malfunction..")
+        val = ""
+        while val not in ['0', '1']:
+            val = input("\npress '0' for sensor malfunction and '1' for working sensor..")
+        return val == "0"

@@ -26,10 +26,10 @@ class DataAccessor(ABC):
     @abstractmethod
     def get_signals_by_components(self, components: List[str]) -> List[SensorData]:
         """
-        Retrieves the sensor data data for the specified components.
+        Retrieves the sensor data for the specified components.
 
         :param components: components to retrieve sensor data for
-        :return: sensor data data for each component
+        :return: sensor data for each component
         """
         pass
 

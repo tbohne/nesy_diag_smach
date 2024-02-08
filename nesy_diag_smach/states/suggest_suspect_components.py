@@ -86,7 +86,8 @@ class SuggestSuspectComponents(smach.State):
         """
         sensor_usage = []
         for comp in suspect_components:
-            use = self.qt.query_sensor_usage_by_suspect_component(comp)[0]
+            # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
+            use = True  # self.qt.query_sensor_usage_by_suspect_component(comp)[0]
             print("comp:", comp, "// use sensor:", use)
             sensor_usage.append(use)
         return sensor_usage

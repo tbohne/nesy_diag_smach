@@ -21,8 +21,7 @@ class LocalDataAccessor(DataAccessor):
     def __init__(self):
         pass
 
-    @staticmethod
-    def get_fault_context() -> FaultContext:
+    def get_fault_context(self) -> FaultContext:
         """
         Retrieves the fault context data required in the diagnostic process.
 
@@ -35,8 +34,7 @@ class LocalDataAccessor(DataAccessor):
         print(fault_context)
         return fault_context
 
-    @staticmethod
-    def get_signals_by_components(components: List[str]) -> List[SensorData]:
+    def get_signals_by_components(self, components: List[str]) -> List[SensorData]:
         """
         Retrieves the sensor data for the specified components.
 

@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 # @author Tim Bohne
 
+import json
 from typing import List
 
 from oscillogram_classification import preprocess
 
-from nesy_diag_smach.config import SESSION_DIR
+from nesy_diag_smach.config import SESSION_DIR, FAULT_CONTEXT_INPUT_FILE
 from nesy_diag_smach.config import SIGNAL_SESSION_FILES
 from nesy_diag_smach.data_types.fault_context import FaultContext
 from nesy_diag_smach.data_types.sensor_data import SensorData
@@ -29,8 +30,15 @@ class LocalDataAccessor(DataAccessor):
         """
         val = None
         while val != "":
-            val = input("\nlocal interface impl.: sim processing fault context data..")
-        fault_context = FaultContext(['E12345'], "1234567890ABCDEFGHJKLMNPRSTUVWXYZ")
+            val = input("\nlocal interface impl.: processing fault context data..")
+
+        with open(FAULT_CONTEXT_INPUT_FILE, "r") as f:
+            problem_instance = json.load(f)
+
+        # only take list of error codes as input, not more
+        input_error_codes = list(problem_instance["error_codes"].keys())
+
+        fault_context = FaultContext(input_error_codes, "1234567890ABCDEFGHJKLMNPRSTUVWXYZ")
         print(fault_context)
         return fault_context
 

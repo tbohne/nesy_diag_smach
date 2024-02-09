@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # @author Tim Bohne
 
+import datetime
 import json
 import os
 from typing import Dict, List, Union
@@ -71,16 +72,6 @@ class ProvideDiagAndShowTrace(smach.State):
         return self.qt.query_fault_condition_instance_by_code(dtc)[0].split("#")[1]
 
     @staticmethod
-    def read_metadata() -> Dict[str, Union[int, str]]:
-        """
-        Reads the metadata from the session directory.
-
-        :return: metadata dictionary
-        """
-        with open(SESSION_DIR + '/metadata.json', 'r') as f:
-            return json.load(f)
-
-    @staticmethod
     def read_fault_context() -> Dict[str, Union[str, List[str]]]:
         """
         Reads the fault context data from the session directory.
@@ -108,7 +99,7 @@ class ProvideDiagAndShowTrace(smach.State):
         :param fault_context: fault context data to query diag subject ID for
         :return: diag subject ID
         """
-        return self.qt.query_diag_subject_instance_by_id(fault_context["id"])[0].split("#")[1]
+        return self.qt.query_diag_subject_instance_by_id(fault_context["diag_subject_id"])[0].split("#")[1]
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
@@ -140,13 +131,12 @@ class ProvideDiagAndShowTrace(smach.State):
             "PROVIDE_DIAG_AND_SHOW_TRACE", "diag", "uploaded_diag"
         ))
 
-        data = self.read_metadata()
         fault_context = self.read_fault_context()
         classification_ids = self.read_classification_ids()
         diag_subject_id = self.read_diag_subject_id(fault_context)
 
         self.instance_gen.extend_knowledge_graph_with_diag_log(
-            data["diag_date"], fault_context["error_code_list"], list(fault_paths.keys()), classification_ids,
+            str(datetime.datetime), fault_context["error_code_list"], list(fault_paths.keys()), classification_ids,
             diag_subject_id
         )
         return "uploaded_diag"

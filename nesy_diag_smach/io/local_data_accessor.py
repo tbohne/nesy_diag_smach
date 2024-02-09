@@ -7,7 +7,7 @@ from typing import List
 
 from oscillogram_classification import preprocess
 
-from nesy_diag_smach.config import SESSION_DIR, FAULT_CONTEXT_INPUT_FILE
+from nesy_diag_smach.config import FAULT_CONTEXT_INPUT_FILE
 from nesy_diag_smach.config import SIGNAL_SESSION_FILES
 from nesy_diag_smach.data_types.fault_context import FaultContext
 from nesy_diag_smach.data_types.sensor_data import SensorData
@@ -54,8 +54,15 @@ class LocalDataAccessor(DataAccessor):
             val = input("\nlocal interface impl.: sim human - press 'ENTER' when the recording phase is finished"
                         + " and the signals are generated for " + str(components))
         signals = []
+
+        # for each component we need to check the ground truth of the instance - if it should have an anomaly
+        with open(FAULT_CONTEXT_INPUT_FILE, "r") as f:
+            problem_instance = json.load(f)
+
         for comp in components:
-            path = SESSION_DIR + "/" + SIGNAL_SESSION_FILES + "/" + comp + ".csv"
+            print("GROUND TRUTH ANOMALY:", problem_instance["suspect_components"][comp][0])
+            anomaly_suffix = "POS" if problem_instance["suspect_components"][comp][0] else "NEG"
+            path = "res/" + SIGNAL_SESSION_FILES + "/" + comp + "/dummy_signal_" + anomaly_suffix + ".csv"
             _, values = preprocess.read_oscilloscope_recording(path)
             signals.append(SensorData(values, comp))
         return signals

@@ -406,11 +406,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
         not_yet_visited = []
         for comp in affecting_comps:
-            add = True
-            for i in range(len(causal_paths)):
-                if comp in causal_paths[i]:
-                    add = False
-            if add:
+            if not any(comp in causal_paths[i] for i in range(len(causal_paths))):
                 not_yet_visited.append(comp)
 
         unisolated_anomalous_components += not_yet_visited

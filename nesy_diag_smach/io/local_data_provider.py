@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # @author Tim Bohne
 
+import json
 import os
 import platform
 from typing import List
@@ -9,6 +10,7 @@ from typing import List
 from PIL import Image
 from termcolor import colored
 
+from nesy_diag_smach.config import FAULT_CONTEXT_INPUT_FILE
 from nesy_diag_smach.data_types.state_transition import StateTransition
 from nesy_diag_smach.interfaces.data_provider import DataProvider
 
@@ -53,6 +55,21 @@ class LocalDataProvider(DataProvider):
 
         :param fault_paths: final diagnosis
         """
+        # compare to ground truth
+        with open(FAULT_CONTEXT_INPUT_FILE, "r") as f:
+            problem_instance = json.load(f)
+
+        ground_truth_fault_paths = problem_instance["ground_truth_fault_paths"]
+        determined_fault_paths = [path.split(" -> ") for path in fault_paths]
+        print("#####################################################################")
+        print("GROUND TRUTH FAULT PATHS:", ground_truth_fault_paths)
+        print("DETERMINED FAULT PATHS:", determined_fault_paths)
+        print("#####################################################################")
+
+        assert len(ground_truth_fault_paths) == len(fault_paths)
+        assert all(gtfp in determined_fault_paths for gtfp in ground_truth_fault_paths)
+        print("all processed...")
+
         for fault_path in fault_paths:
             print(colored(fault_path, "red", "on_white", ["bold"]))
 

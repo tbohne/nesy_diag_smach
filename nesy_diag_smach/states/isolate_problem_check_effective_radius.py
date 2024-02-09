@@ -490,6 +490,23 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 return json.load(f)
         return {}
 
+    @staticmethod
+    def find_unique_longest_paths(paths: Dict[str, List[List[str]]]) -> Dict[str, List[List[str]]]:
+        preprocessed_fault_paths = [path[0] for path in list(paths.values())]
+        unique_paths = []
+        paths_sorted = sorted(preprocessed_fault_paths, key=len, reverse=True)
+        for path in paths_sorted:
+            if not any(" ".join(path) in " ".join(unique_path) for unique_path in unique_paths):
+                unique_paths.append(path)
+
+        res_dict = {}
+        for fault_path in unique_paths:
+            for comp in paths.keys():
+                if paths[comp] == [fault_path]:
+                    res_dict[comp] = [fault_path]
+                    break
+        return res_dict
+
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
         Execution of 'ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS' state.
@@ -547,7 +564,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         # load potential previous paths from session files
         already_found_fault_paths = self.load_already_found_fault_paths()
         already_found_fault_paths.update(anomalous_paths)  # merge dictionaries (already found + new ones)
-        userdata.fault_paths = already_found_fault_paths
+        userdata.fault_paths = self.find_unique_longest_paths(already_found_fault_paths)
         self.data_provider.provide_state_transition(StateTransition(
             "ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "PROVIDE_DIAG_AND_SHOW_TRACE", "isolated_problem"
         ))

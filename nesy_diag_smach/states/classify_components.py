@@ -137,7 +137,7 @@ class ClassifyComponents(smach.State):
         :param classification_instances: generated classification instances
         """
         for sensor_rec in sensor_recordings:  # iteratively process parallel recorded sensor signals
-            sensor_rec_id = self.instance_gen.extend_knowledge_graph_with_oscillogram(sensor_rec.time_series)
+            sensor_rec_id = self.instance_gen.extend_knowledge_graph_with_time_series(sensor_rec.time_series)
             print(colored("\n\nclassifying:" + sensor_rec.comp_name, "green", "on_grey", ["bold"]))
             values = sensor_rec.time_series
 
@@ -178,7 +178,7 @@ class ClassifyComponents(smach.State):
             )
             heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), sensor_rec.comp_name + res_str)
             self.data_provider.provide_heatmaps(heatmap_img, sensor_rec.comp_name + res_str)
-            classification_id = self.instance_gen.extend_knowledge_graph_with_sensor_signal_classification(
+            classification_id = self.instance_gen.extend_knowledge_graph_with_signal_classification(
                 anomaly, components_to_be_recorded[sensor_rec.comp_name], sensor_rec.comp_name, pred_value,
                 model_meta_info["model_id"], sensor_rec_id, heatmap_id
             )

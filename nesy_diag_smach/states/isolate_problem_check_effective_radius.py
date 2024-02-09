@@ -403,7 +403,17 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
         affecting_comps = self.qt.query_affected_by_relations_by_suspect_component(checked_comp)
         print("component potentially affected by:", affecting_comps)
-        unisolated_anomalous_components += affecting_comps
+
+        not_yet_visited = []
+        for comp in affecting_comps:
+            add = True
+            for i in range(len(causal_paths)):
+                if comp in causal_paths[i]:
+                    add = False
+            if add:
+                not_yet_visited.append(comp)
+
+        unisolated_anomalous_components += not_yet_visited
         explicitly_considered_links[checked_comp] += affecting_comps.copy()
 
     def work_through_unisolated_components(

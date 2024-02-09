@@ -61,7 +61,7 @@ class LocalDataAccessor(DataAccessor):
 
         for comp in components:
             print("GROUND TRUTH ANOMALY:", problem_instance["suspect_components"][comp][0])
-            anomaly_suffix = "POS" if problem_instance["suspect_components"][comp][0] else "NEG"
+            anomaly_suffix = "NEG" if problem_instance["suspect_components"][comp][0] else "POS"
             path = "res/" + SIGNAL_SESSION_FILES + "/" + comp + "/dummy_signal_" + anomaly_suffix + ".csv"
             _, values = preprocess.read_oscilloscope_recording(path)
             signals.append(SensorData(values, comp))

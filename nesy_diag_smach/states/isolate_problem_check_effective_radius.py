@@ -115,7 +115,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         sensor_signals = self.data_accessor.get_signals_by_components([affecting_comp])
         assert len(sensor_signals) == 1
         values = sensor_signals[0].time_series
-        signal_id = self.instance_gen.extend_knowledge_graph_with_sensor_signal(values)
+        signal_id = self.instance_gen.extend_knowledge_graph_with_time_series(values)
         model, model_meta_info = self.get_model_and_metadata(affecting_comp)
         values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values)
         net_input = util.construct_net_input(model, values)
@@ -434,7 +434,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                         causal_paths, comp_to_be_checked, unisolated_anomalous_comps, explicitly_considered_links
                     )
                 continue
-            use_sensor_signal = self.qt.query_sensor_signal_usage_by_suspect_component(comp_to_be_checked)[0]
+            # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
+            use_sensor_signal = True  # self.qt.query_sensor_signal_usage_by_suspect_component(comp_to_be_checked)[0]
             if use_sensor_signal:
                 print("use sensor signal..")
                 classification_res = self.classify_component(

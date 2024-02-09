@@ -9,7 +9,7 @@ import smach
 from nesy_diag_ontology import ontology_instance_generator
 from termcolor import colored
 
-from nesy_diag_smach.config import SESSION_DIR, FAULT_CONTEXT_FILE, ERROR_CODE_TMP_FILE
+from nesy_diag_smach.config import SESSION_DIR, FAULT_CONTEXT_FILE, ERROR_CODE_TMP_FILE, CLASSIFICATION_LOG_FILE
 from nesy_diag_smach.data_types.fault_context import FaultContext
 from nesy_diag_smach.data_types.state_transition import StateTransition
 from nesy_diag_smach.interfaces.data_accessor import DataAccessor
@@ -71,6 +71,12 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
             error_code_tmp = {'list': fault_context.error_code_list}
             json.dump(error_code_tmp, f, default=str)
 
+    @staticmethod
+    def create_session_setup():
+        os.makedirs(SESSION_DIR, exist_ok=True)
+        with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, 'w') as f:
+            f.write("[]")
+
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
         Execution of 'READ_FAULT_CONTEXT_AND_GEN_ONTOLOGY_INSTANCES' state.
@@ -79,6 +85,7 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
         :return: outcome of the state ("processed_fault_context")
         """
         self.log_state_info()
+        self.create_session_setup()
         fault_context = self.data_accessor.get_fault_context()
         self.write_fault_context_to_session_file(fault_context)
 

@@ -522,12 +522,13 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             all_paths.extend(self.find_paths_dfs(anomaly_graph, path_src))
         return self.find_unique_longest_paths(all_paths)
 
-    def find_unique_longest_paths(self, paths):
+    @staticmethod
+    def find_unique_longest_paths(paths):
         unique_paths = []
         paths_sorted = sorted(paths, key=len, reverse=True)
         for path in paths_sorted:
-            if not any(" ".join(path) in " ".join(unique_path) for unique_path in unique_paths):
-                unique_paths.append(path)
+            if not any(" ".join(list(path)) in " ".join(unique_path) for unique_path in unique_paths):
+                unique_paths.append(list(path))
         return unique_paths
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:

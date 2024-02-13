@@ -555,11 +555,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             for fp in fault_paths:
                 print(fp)
 
-            # TODO: check if we need this for one-comp paths
-            # # handle one-component-paths
-            # for anomaly in anomalous_components:
-            #     if anomaly not in " ".join(edges):
-            #         fault_paths.append([anomaly])
+            # handle one-component-paths
+            for k in explicitly_considered_links.keys():
+                if already_checked_components[k][0] and k not in " ".join(edges):  # unconsidered anomaly
+                    fault_paths.append([k])
 
             anomalous_paths[anomalous_comp] = fault_paths
         visualizations = self.gen_causal_graph_visualizations(

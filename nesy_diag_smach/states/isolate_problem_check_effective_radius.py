@@ -364,7 +364,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     def handle_anomaly(
             self, checked_comp: str, unisolated_anomalous_components: List[str],
-            explicitly_considered_links: Dict[str, List[str]], already_checked_comps
+            explicitly_considered_links: Dict[str, List[str]], already_checked_comps: Dict[str, Tuple[bool, str]]
     ) -> None:
         """
         Handles anomaly cases, i.e., extends unisolated anomalous components and explicitly considered links.
@@ -372,7 +372,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param checked_comp: checked component (found anomaly)
         :param unisolated_anomalous_components: list of unisolated anomalous components to be extended
         :param explicitly_considered_links: list of explicitly considered links to be extended
-        :param already_checked_comps: list of already checked components
+        :param already_checked_comps: dict of already checked components
         """
         affecting_comps = self.qt.query_affected_by_relations_by_suspect_component(checked_comp)
         print("component potentially affected by:", affecting_comps)

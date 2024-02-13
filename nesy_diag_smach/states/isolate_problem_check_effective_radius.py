@@ -363,59 +363,27 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         return self.qt.query_suspect_component_name_by_id(comp_id)[0]
 
     def handle_anomaly(
-            self, causal_paths: List[List[str]], checked_comp: str, unisolated_anomalous_components: List[str],
-            explicitly_considered_links: Dict[str, List[str]]
+            self, checked_comp: str, unisolated_anomalous_components: List[str],
+            explicitly_considered_links: Dict[str, List[str]], already_checked_comps
     ) -> None:
         """
-        Handles anomaly cases, i.e., extends the causal path, unisolated anomalous components, and explicitly
-        considered links.
+        Handles anomaly cases, i.e., extends unisolated anomalous components and explicitly considered links.
 
-        :param causal_paths: causal paths to be extended
         :param checked_comp: checked component (found anomaly)
         :param unisolated_anomalous_components: list of unisolated anomalous components to be extended
         :param explicitly_considered_links: list of explicitly considered links to be extended
+        :param already_checked_comps: list of already checked components
         """
-        already_in_path = False
-        for i in range(len(causal_paths)):
-            if checked_comp in causal_paths[i]:
-                already_in_path = True
-
-        if not already_in_path:
-            found_link_in_path = False
-            path_indices = []
-            for i in range(len(causal_paths)):
-                last_comp = causal_paths[i][-1]
-                if checked_comp in explicitly_considered_links[last_comp]:
-                    found_link_in_path = True
-                    path_indices.append(i)
-
-            # extend path
-            if found_link_in_path:
-                for idx in path_indices:
-                    causal_paths[idx].append(checked_comp)
-            else:  # branch
-                for i in range(len(causal_paths)):
-                    second_last_comp = causal_paths[i][-2]
-                    if checked_comp in explicitly_considered_links[second_last_comp]:
-                        # this thing has to branch
-                        prev_path = causal_paths[i][:len(causal_paths[i]) - 1].copy()
-                        prev_path.append(checked_comp)
-                        causal_paths.append(prev_path)
-
         affecting_comps = self.qt.query_affected_by_relations_by_suspect_component(checked_comp)
         print("component potentially affected by:", affecting_comps)
-
-        not_yet_visited = []
-        for comp in affecting_comps:
-            if not any(comp in causal_paths[i] for i in range(len(causal_paths))):
-                not_yet_visited.append(comp)
-
+        explicitly_checked = [k for k in explicitly_considered_links.keys() if already_checked_comps[k][0]]
+        not_yet_visited = [comp for comp in affecting_comps if comp not in explicitly_checked]
         unisolated_anomalous_components += not_yet_visited
         explicitly_considered_links[checked_comp] += affecting_comps.copy()
 
     def work_through_unisolated_components(
             self, unisolated_comps: List[str], explicitly_considered_links: Dict[str, List[str]],
-            already_checked_comps: Dict[str, Tuple[bool, str]], causal_paths: List[List[str]], error_code: str,
+            already_checked_comps: Dict[str, Tuple[bool, str]], error_code: str,
             anomalous_comp: str
     ) -> None:
         """
@@ -424,7 +392,6 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param unisolated_comps: unisolated components to work though
         :param explicitly_considered_links: list of explicitly considered links
         :param already_checked_comps: previously checked components (used to avoid redundant classifications)
-        :param causal_paths: causal paths to be extended
         :param error_code: error code the original component suggestion was based on
         :param anomalous_comp: initial anomalous component (entry point)
         """
@@ -438,7 +405,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                       already_checked_comps[comp_to_be_checked][0])
                 if already_checked_comps[comp_to_be_checked][0]:
                     self.handle_anomaly(
-                        causal_paths, comp_to_be_checked, unisolated_comps, explicitly_considered_links
+                        comp_to_be_checked, unisolated_comps, explicitly_considered_links, already_checked_comps
                     )
                 continue
             # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
@@ -464,7 +431,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 already_checked_comps[comp_to_be_checked] = (anomaly, classification_id)
             if anomaly:
                 self.handle_anomaly(
-                    causal_paths, comp_to_be_checked, unisolated_comps, explicitly_considered_links
+                    comp_to_be_checked, unisolated_comps, explicitly_considered_links, already_checked_comps
                 )
             self.log_classification_action(comp_to_be_checked, bool(anomaly), use_sensor_signal, classification_id)
 
@@ -564,9 +531,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
             print("component potentially affected by:", affecting_components)
             unisolated_components = affecting_components
-            causal_paths = [[anomalous_comp]]
             self.work_through_unisolated_components(
-                unisolated_components, explicitly_considered_links, already_checked_components, causal_paths,
+                unisolated_components, explicitly_considered_links, already_checked_components,
                 self.read_error_code_suggestion(anomalous_comp), anomalous_comp
             )
             print("explicitly considered links:", explicitly_considered_links)

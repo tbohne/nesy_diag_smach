@@ -5,6 +5,7 @@
 import io
 import json
 import os
+from collections import defaultdict
 from typing import Union, List, Tuple, Dict
 
 import matplotlib.pyplot as plt
@@ -413,22 +414,22 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         explicitly_considered_links[checked_comp] += affecting_comps.copy()
 
     def work_through_unisolated_components(
-            self, unisolated_anomalous_comps: List[str], explicitly_considered_links: Dict[str, List[str]],
+            self, unisolated_comps: List[str], explicitly_considered_links: Dict[str, List[str]],
             already_checked_comps: Dict[str, Tuple[bool, str]], causal_paths: List[List[str]], error_code: str,
             anomalous_comp: str
     ) -> None:
         """
         Works through the unisolated components, i.e., performs fault isolation.
 
-        :param unisolated_anomalous_comps: unisolated anomalous components to work though
+        :param unisolated_comps: unisolated components to work though
         :param explicitly_considered_links: list of explicitly considered links
         :param already_checked_comps: previously checked components (used to avoid redundant classifications)
         :param causal_paths: causal paths to be extended
         :param error_code: error code the original component suggestion was based on
         :param anomalous_comp: initial anomalous component (entry point)
         """
-        while len(unisolated_anomalous_comps) > 0:
-            comp_to_be_checked = unisolated_anomalous_comps.pop(0)
+        while len(unisolated_comps) > 0:
+            comp_to_be_checked = unisolated_comps.pop(0)
             print(colored("\ncomponent to be checked: " + comp_to_be_checked, "green", "on_grey", ["bold"]))
             if comp_to_be_checked not in list(explicitly_considered_links.keys()):
                 explicitly_considered_links[comp_to_be_checked] = []
@@ -437,7 +438,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                       already_checked_comps[comp_to_be_checked][0])
                 if already_checked_comps[comp_to_be_checked][0]:
                     self.handle_anomaly(
-                        causal_paths, comp_to_be_checked, unisolated_anomalous_comps, explicitly_considered_links
+                        causal_paths, comp_to_be_checked, unisolated_comps, explicitly_considered_links
                     )
                 continue
             # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
@@ -463,7 +464,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 already_checked_comps[comp_to_be_checked] = (anomaly, classification_id)
             if anomaly:
                 self.handle_anomaly(
-                    causal_paths, comp_to_be_checked, unisolated_anomalous_comps, explicitly_considered_links
+                    causal_paths, comp_to_be_checked, unisolated_comps, explicitly_considered_links
                 )
             self.log_classification_action(comp_to_be_checked, bool(anomaly), use_sensor_signal, classification_id)
 
@@ -491,21 +492,43 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         return {}
 
     @staticmethod
-    def find_unique_longest_paths(paths: Dict[str, List[List[str]]]) -> Dict[str, List[List[str]]]:
-        preprocessed_fault_paths = [path[0] for path in list(paths.values())]
+    def find_unique_longest_paths_over_dict(paths: Dict[str, List[List[str]]]) -> Dict[str, List[List[str]]]:
+        # TODO: a fault path that is found based on several entry components is only stored under the one it was
+        #       first found with
+        already_seen_paths = []
+        for k in paths.keys():
+            updated_paths = []
+            for path in paths[k]:
+                if path not in already_seen_paths:
+                    updated_paths.append(path)
+                    already_seen_paths.append(path)
+            paths[k] = updated_paths
+        return paths
+
+    def find_paths_dfs(self, anomaly_graph, node, path=[]):
+        if node in path:  # deal with cyclic relations
+            return [path]
+        path = path + [node]  # not using append() because it wouldn't create a new list
+        if node not in anomaly_graph:
+            return [path]
+        paths = []
+        for node in anomaly_graph[node]:
+            paths.extend(self.find_paths_dfs(anomaly_graph, node, path))
+        return paths
+
+    def find_all_longest_paths(self, anomaly_graph):
+        all_paths = []
+        for path_src in anomaly_graph:
+            all_paths.extend(self.find_paths_dfs(anomaly_graph, path_src))
+        return self.find_unique_longest_paths(all_paths)
+
+    def find_unique_longest_paths(self, paths):
         unique_paths = []
-        paths_sorted = sorted(preprocessed_fault_paths, key=len, reverse=True)
+        paths_sorted = sorted(paths, key=len, reverse=True)
         for path in paths_sorted:
             if not any(" ".join(path) in " ".join(unique_path) for unique_path in unique_paths):
                 unique_paths.append(path)
-
-        res_dict = {}
-        for fault_path in unique_paths:
-            for comp in paths.keys():
-                if paths[comp] == [fault_path]:
-                    res_dict[comp] = [fault_path]
-                    break
-        return res_dict
+        return unique_paths
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
@@ -539,13 +562,39 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 explicitly_considered_links[anomalous_comp] += affecting_components.copy()
 
             print("component potentially affected by:", affecting_components)
-            unisolated_anomalous_components = affecting_components
+            unisolated_components = affecting_components
             causal_paths = [[anomalous_comp]]
             self.work_through_unisolated_components(
-                unisolated_anomalous_components, explicitly_considered_links, already_checked_components, causal_paths,
+                unisolated_components, explicitly_considered_links, already_checked_components, causal_paths,
                 self.read_error_code_suggestion(anomalous_comp), anomalous_comp
             )
-            anomalous_paths[anomalous_comp] = causal_paths
+            print("explicitly considered links:", explicitly_considered_links)
+            edges = []
+            for k in explicitly_considered_links.keys():
+                if already_checked_components[k][0]:
+                    for v in explicitly_considered_links[k]:
+                        if already_checked_components[v][0]:
+                            edges.append(k + " -> " + v)
+
+            edges = edges[::-1]  # has to be reversed, affected-by direction
+            # create adjacency lists
+            anomaly_graph = defaultdict(list)
+            for edge in edges:
+                start, end = edge.split(' -> ')
+                anomaly_graph[start].append(end)
+
+            fault_paths = self.find_all_longest_paths(anomaly_graph)
+            print("first comp isolated - FAULT PATHS:")
+            for fp in fault_paths:
+                print(fp)
+
+            # TODO: check if we need this for one-comp paths
+            # # handle one-component-paths
+            # for anomaly in anomalous_components:
+            #     if anomaly not in " ".join(edges):
+            #         fault_paths.append([anomaly])
+
+            anomalous_paths[anomalous_comp] = fault_paths
         visualizations = self.gen_causal_graph_visualizations(
             anomalous_paths, complete_graphs, explicitly_considered_links
         )
@@ -564,7 +613,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         # load potential previous paths from session files
         already_found_fault_paths = self.load_already_found_fault_paths()
         already_found_fault_paths.update(anomalous_paths)  # merge dictionaries (already found + new ones)
-        userdata.fault_paths = self.find_unique_longest_paths(already_found_fault_paths)
+        userdata.fault_paths = self.find_unique_longest_paths_over_dict(already_found_fault_paths)
         self.data_provider.provide_state_transition(StateTransition(
             "ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "PROVIDE_DIAG_AND_SHOW_TRACE", "isolated_problem"
         ))

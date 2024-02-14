@@ -4,6 +4,7 @@
 
 import json
 import os
+import shutil
 
 import smach
 from nesy_diag_ontology import ontology_instance_generator
@@ -73,7 +74,18 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
 
     @staticmethod
     def create_session_setup():
-        os.makedirs(SESSION_DIR, exist_ok=True)
+        if os.path.exists(SESSION_DIR):
+            for filename in os.listdir(SESSION_DIR):
+                file_path = os.path.join(SESSION_DIR, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+        else:
+            os.makedirs(SESSION_DIR)
         with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, 'w') as f:
             f.write("[]")
 

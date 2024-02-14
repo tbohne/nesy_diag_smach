@@ -442,8 +442,14 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
         :param fault_paths: already found fault paths to be saved in session dir
         """
+        if os.path.exists(SESSION_DIR + "/" + FAULT_PATH_TMP_FILE):
+            with open(SESSION_DIR + "/" + FAULT_PATH_TMP_FILE, "r") as f:
+                existing_data = json.load(f)
+            existing_data.update(fault_paths)
+        else:
+            existing_data = fault_paths
         with open(SESSION_DIR + "/" + FAULT_PATH_TMP_FILE, "w") as f:
-            json.dump(fault_paths, f, default=str)
+            json.dump(existing_data, f, default=str)
 
     @staticmethod
     def load_already_found_fault_paths() -> Dict[str, List[List[str]]]:
@@ -516,6 +522,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         explicitly_considered_links = {}
         self.visualize_initial_graph(anomalous_paths, complete_graphs, explicitly_considered_links)
 
+        # load potential previous paths from session files
+        already_found_fault_paths = self.load_already_found_fault_paths()
+
         # important to compare to userdata here to not have a dictionary of changed size during iteration
         for class_id in userdata.classified_components:
             anomalous_comp = self.retrieve_sus_comp(class_id)
@@ -556,9 +565,13 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 print(fp)
 
             # handle one-component-paths
+            all_previous_paths = list(already_found_fault_paths.values())
+            if len(all_previous_paths) > 0:
+                all_previous_paths = all_previous_paths[0][0]
             for k in explicitly_considered_links.keys():
                 if already_checked_components[k][0] and k not in " ".join(edges):  # unconsidered anomaly
-                    fault_paths.append([k])
+                    if not any(k in i for i in all_previous_paths):  # also not part of previous paths
+                        fault_paths.append([k])
 
             anomalous_paths[anomalous_comp] = fault_paths
         visualizations = self.gen_causal_graph_visualizations(
@@ -576,8 +589,6 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             ))
             return "isolated_problem_remaining_error_codes"
 
-        # load potential previous paths from session files
-        already_found_fault_paths = self.load_already_found_fault_paths()
         already_found_fault_paths.update(anomalous_paths)  # merge dictionaries (already found + new ones)
         userdata.fault_paths = self.find_unique_longest_paths_over_dict(already_found_fault_paths)
         self.data_provider.provide_state_transition(StateTransition(

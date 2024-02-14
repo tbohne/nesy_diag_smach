@@ -83,7 +83,7 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
                     elif os.path.isdir(file_path):
                         shutil.rmtree(file_path)
                 except Exception as e:
-                    print(f"Failed to delete {file_path}. Reason: {e}")
+                    print(f"failed to delete {file_path} - {e}")
         else:
             os.makedirs(SESSION_DIR)
         with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, 'w') as f:

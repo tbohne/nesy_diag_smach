@@ -210,21 +210,55 @@ class ClassifyComponents(smach.State):
 
     @staticmethod
     def gen_classified_components_dict(
-            non_anomalous_components: List[str], anomalous_components: List[str]
+            non_anomalous_components: List[str], anomalous_components: List[str], prev_recorded: List[str]
     ) -> Dict[str, bool]:
         """
         Generates the dictionary of classified components.
 
         :param non_anomalous_components: list of regular components
         :param anomalous_components: list of anomalous components
+        :param prev_recorded: list of previously recorded components
         :return: classified components dict ({comp: anomaly})
         """
         classified_components = {}
         for comp in non_anomalous_components:
-            classified_components[comp] = False
+            if comp not in prev_recorded:
+                classified_components[comp] = False
         for comp in anomalous_components:
-            classified_components[comp] = True
+            if comp not in prev_recorded:
+                classified_components[comp] = True
         return classified_components
+
+    @staticmethod
+    def consider_prev_recorded_components(
+            components_to_be_recorded: Dict[str, str], prev_recorded: List[str], anomalous_components: List[str],
+            non_anomalous_components: List[str]
+    ) -> Dict[str, Dict[str, str]]:
+        """
+        Ensures to only record components that haven't been recorded before, i.e., reads already classified components.
+
+        :param components_to_be_recorded: a priori list of components to be recorded
+        :param prev_recorded: list of previously recorded components (to be filled)
+        :param anomalous_components: list of anomalous components (to be filled)
+        :param non_anomalous_components: list of non-anomalous components (to be filled)
+        :return: dictionary of already classified components
+        """
+        with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "r") as f:
+            log_file = json.load(f)
+            # component name mapped to classification dict
+            already_classified_comps = {list(classification.keys())[0]: classification for classification in log_file}
+            for c in components_to_be_recorded:
+                if c in already_classified_comps:
+                    prev_recorded.append(c)
+                    anomaly = already_classified_comps[c][c]
+                    if anomaly:
+                        anomalous_components.append(c)
+                    else:
+                        non_anomalous_components.append(c)
+            # remove already recorded ones from list, i.e., create a posteriori list of components to be recorded
+            for c in prev_recorded:
+                components_to_be_recorded.pop(c)
+        return already_classified_comps
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
@@ -237,10 +271,16 @@ class ClassifyComponents(smach.State):
         components_to_be_recorded, components_to_be_manually_verified = self.perform_synchronized_sensor_recordings(
             userdata.suggestion_list
         )
-        sensor_signals = self.data_accessor.get_signals_by_components(list(components_to_be_recorded.keys()))
         anomalous_components = []
         non_anomalous_components = []
         classification_instances = {}
+        prev_recorded = []
+
+        already_classified_components = self.consider_prev_recorded_components(
+            components_to_be_recorded, prev_recorded, anomalous_components, non_anomalous_components
+        )
+        sensor_signals = self.data_accessor.get_signals_by_components(list(components_to_be_recorded.keys()))
+
         self.process_sensor_recordings(
             sensor_signals, userdata.suggestion_list, anomalous_components, non_anomalous_components,
             components_to_be_recorded, classification_instances
@@ -248,8 +288,14 @@ class ClassifyComponents(smach.State):
         self.perform_manual_classifications(
             components_to_be_manually_verified, classification_instances, anomalous_components, non_anomalous_components
         )
-        classified_components = self.gen_classified_components_dict(non_anomalous_components, anomalous_components)
+        classified_components = self.gen_classified_components_dict(
+            non_anomalous_components, anomalous_components, prev_recorded
+        )
+        # here we also need to add those that were classified previously (mapping: name -> classification_id)
+        for comp in prev_recorded:
+            classification_instances[comp] = already_classified_components[comp]["Classification ID"]
         userdata.classified_components = list(classification_instances.values())
+
         self.log_classification_actions(
             classified_components, list(components_to_be_manually_verified.keys()), classification_instances
         )

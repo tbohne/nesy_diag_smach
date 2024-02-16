@@ -364,7 +364,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     def handle_anomaly(
             self, checked_comp: str, unisolated_anomalous_components: List[str],
-            explicitly_considered_links: Dict[str, List[str]], already_checked_comps: Dict[str, Tuple[bool, str]]
+            explicitly_considered_links: Dict[str, List[str]], classified_components: Dict[str, Tuple[bool, str]],
+            prev_classified_components: Dict[str, Tuple[bool, str]]
     ) -> None:
         """
         Handles anomaly cases, i.e., extends unisolated anomalous components and explicitly considered links.
@@ -372,40 +373,51 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param checked_comp: checked component (found anomaly)
         :param unisolated_anomalous_components: list of unisolated anomalous components to be extended
         :param explicitly_considered_links: list of explicitly considered links to be extended
-        :param already_checked_comps: dict of already checked components
+        :param classified_components: dict of already checked components (in classification state)
+        :param prev_classified_components: dict of already checked components (in previous iterations)
         """
         affecting_comps = self.qt.query_affected_by_relations_by_suspect_component(checked_comp)
         print("component potentially affected by:", affecting_comps)
-        explicitly_checked = [k for k in explicitly_considered_links.keys() if already_checked_comps[k][0]]
-        not_yet_visited = [comp for comp in affecting_comps if comp not in explicitly_checked]
+        already_considered_anomaly_links = [comp for comp in explicitly_considered_links[checked_comp] if (
+                comp in classified_components and classified_components[comp][0]
+                or comp in prev_classified_components and prev_classified_components[comp][0]
+        )]
+        not_yet_visited = [comp for comp in affecting_comps if comp not in already_considered_anomaly_links]
         unisolated_anomalous_components += not_yet_visited
         explicitly_considered_links[checked_comp] += affecting_comps.copy()
 
     def work_through_unisolated_components(
             self, unisolated_comps: List[str], explicitly_considered_links: Dict[str, List[str]],
-            already_checked_comps: Dict[str, Tuple[bool, str]], error_code: str,
-            anomalous_comp: str
+            classified_components: Dict[str, Tuple[bool, str]], error_code: str,
+            anomalous_comp: str, prev_classified_components: Dict[str, Tuple[bool, str]]
     ) -> None:
         """
         Works through the unisolated components, i.e., performs fault isolation.
 
         :param unisolated_comps: unisolated components to work though
         :param explicitly_considered_links: list of explicitly considered links
-        :param already_checked_comps: previously checked components (used to avoid redundant classifications)
+        :param classified_components: dict of already checked components (in classification state)
         :param error_code: error code the original component suggestion was based on
         :param anomalous_comp: initial anomalous component (entry point)
+        :param prev_classified_components: previously checked components (used to avoid redundant classifications)
         """
         while len(unisolated_comps) > 0:
             comp_to_be_checked = unisolated_comps.pop(0)
             print(colored("\ncomponent to be checked: " + comp_to_be_checked, "green", "on_grey", ["bold"]))
             if comp_to_be_checked not in list(explicitly_considered_links.keys()):
                 explicitly_considered_links[comp_to_be_checked] = []
-            if comp_to_be_checked in already_checked_comps.keys():
-                print("already checked this component - anomaly:",
-                      already_checked_comps[comp_to_be_checked][0])
-                if already_checked_comps[comp_to_be_checked][0]:
+
+            # did we find an anomaly for this component before?
+            if comp_to_be_checked in classified_components or comp_to_be_checked in prev_classified_components:
+                prev_found_anomaly = (comp_to_be_checked in classified_components
+                                      and classified_components[comp_to_be_checked][0]
+                                      or comp_to_be_checked in prev_classified_components
+                                      and prev_classified_components[comp_to_be_checked][0])
+                print("already checked this component - anomaly:", prev_found_anomaly)
+                if prev_found_anomaly:
                     self.handle_anomaly(
-                        comp_to_be_checked, unisolated_comps, explicitly_considered_links, already_checked_comps
+                        comp_to_be_checked, unisolated_comps, explicitly_considered_links, classified_components,
+                        prev_classified_components
                     )
                 continue
             # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
@@ -413,25 +425,26 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             if use_sensor_signal:
                 print("use sensor signal..")
                 classification_res = self.classify_component(
-                    comp_to_be_checked, error_code, already_checked_comps[anomalous_comp][1]
+                    comp_to_be_checked, error_code, classified_components[anomalous_comp][1]
                 )
                 if classification_res is None:
                     anomaly = self.data_accessor.get_manual_judgement_for_component(comp_to_be_checked)
                     classification_id = self.instance_gen.extend_knowledge_graph_with_manual_inspection(
-                        anomaly, already_checked_comps[anomalous_comp][1], comp_to_be_checked
+                        anomaly, classified_components[anomalous_comp][1], comp_to_be_checked
                     )
                 else:
                     (anomaly, classification_id) = classification_res
-                already_checked_comps[comp_to_be_checked] = (anomaly, classification_id)
+                classified_components[comp_to_be_checked] = (anomaly, classification_id)
             else:
                 anomaly = self.data_accessor.get_manual_judgement_for_component(comp_to_be_checked)
                 classification_id = self.instance_gen.extend_knowledge_graph_with_manual_inspection(
-                    anomaly, already_checked_comps[anomalous_comp][1], comp_to_be_checked
+                    anomaly, classified_components[anomalous_comp][1], comp_to_be_checked
                 )
-                already_checked_comps[comp_to_be_checked] = (anomaly, classification_id)
+                classified_components[comp_to_be_checked] = (anomaly, classification_id)
             if anomaly:
                 self.handle_anomaly(
-                    comp_to_be_checked, unisolated_comps, explicitly_considered_links, already_checked_comps
+                    comp_to_be_checked, unisolated_comps, explicitly_considered_links, classified_components,
+                    prev_classified_components
                 )
             self.log_classification_action(comp_to_be_checked, bool(anomaly), use_sensor_signal, classification_id)
 
@@ -464,19 +477,41 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 return json.load(f)
         return {}
 
-    @staticmethod
-    def find_unique_longest_paths_over_dict(paths: Dict[str, List[List[str]]]) -> Dict[str, List[List[str]]]:
-        # TODO: a fault path that is found based on several entry components is only stored under the one it was
-        #       first found with
+    def find_unique_longest_paths_over_dict(self, paths: Dict[str, List[List[str]]]) -> Dict[str, List[List[str]]]:
+        """
+        Filters the identified fault paths, i.e., finds the unique longest paths over the specified dictionary.
+
+        :param paths: dict of identified fault paths
+        :return: filtered dict of fault paths
+        """
+        print("FINDING UNIQUE PATHS:")
+        for path in paths.keys():
+            print(paths[path])
+
+        # a fault path that is found based on several components is only stored
+        # under the one it was first found with
         already_seen_paths = []
-        for k in paths.keys():
+        for comp in paths.keys():
             updated_paths = []
-            for path in paths[k]:
+            for path in paths[comp]:
                 if path not in already_seen_paths:
                     updated_paths.append(path)
                     already_seen_paths.append(path)
-            paths[k] = updated_paths
-        return paths
+            paths[comp] = updated_paths
+
+        # another issue: subpaths coming from the file system (from previous iterations or states)
+        all_paths = [path for comp in paths.keys() for path in paths[comp]]
+        filtered_paths = self.find_unique_longest_paths(all_paths)
+        final_dict = defaultdict(list)
+        for comp in paths.keys():
+            for path in paths[comp]:
+                if path in filtered_paths:
+                    final_dict[comp].append(path)
+
+        print("FINAL UNIQUE PATHS:")
+        for comp in final_dict.keys():
+            print(final_dict[comp])
+        return final_dict
 
     def find_paths_dfs(self, anomaly_graph, node, path=[]):
         if node in path:  # deal with cyclic relations
@@ -500,7 +535,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         unique_paths = []
         paths_sorted = sorted(paths, key=len, reverse=True)
         for path in paths_sorted:
-            if not any(" ".join(list(path)) in " ".join(unique_path) for unique_path in unique_paths):
+            if not any("-" + "-".join(list(path)) + "-" in "-" + "-".join(up) + "-" for up in unique_paths):
                 unique_paths.append(list(path))
         return unique_paths
 
@@ -513,12 +548,32 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :return: outcome of the state ("isolated_problem" | "isolated_problem_remaining_error_codes")
         """
         self.log_state_info()
-        already_checked_components = self.retrieve_already_checked_components(userdata.classified_components)
+        # those are only the ones from the prev classification state, not all
+        classified_components = self.retrieve_already_checked_components(userdata.classified_components)
+        # only record those that haven't been recorded before - read already classified components
+        with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "r") as f:
+            log_file = json.load(f)
+            prev_classified_components = {}
+            # component name mapped to classification dict
+            for classification in log_file:
+                comp = list(classification.keys())[0]
+                pred = classification[comp]
+                classification_id = classification["Classification ID"]
+                prev_classified_components[comp] = (pred, classification_id)
+
+        # the components coming from the classification state are not supposed to be handled identical to the ones
+        # classified before, the ones classified before are just to be considered as a lookup for classifications,
+        # not triggering new classifications
+        print("ALREADY CHECKED COMPONENTS - CLASSIFICATION STATE:")
+        print(len(list(classified_components.keys())))
+        print("ALREADY CHECKED COMPONENTS - PREV ITERATIONS:")
+        print(prev_classified_components.keys())
+
         anomalous_paths = {}
         print(colored("constructing causal graph, i.e., subgraph of structural component knowledge..\n",
                       "green", "on_grey", ["bold"]))
         complete_graphs = {comp: self.construct_complete_graph({}, [comp])
-                           for comp in already_checked_components.keys() if already_checked_components[comp][0]}
+                           for comp in classified_components.keys() if classified_components[comp][0]}
         explicitly_considered_links = {}
         self.visualize_initial_graph(anomalous_paths, complete_graphs, explicitly_considered_links)
 
@@ -528,8 +583,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         # important to compare to userdata here to not have a dictionary of changed size during iteration
         for class_id in userdata.classified_components:
             anomalous_comp = self.retrieve_sus_comp(class_id)
-            if not already_checked_components[anomalous_comp][0]:
-                continue
+            # anomalous component ia a new component (just classified in prev state)
+            if not classified_components[anomalous_comp][0]:
+                continue  # already classified and no anomaly
             print(colored("isolating " + anomalous_comp + "..", "green", "on_grey", ["bold"]))
             affecting_components = self.qt.query_affected_by_relations_by_suspect_component(anomalous_comp)
 
@@ -541,15 +597,18 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             print("component potentially affected by:", affecting_components)
             unisolated_components = affecting_components
             self.work_through_unisolated_components(
-                unisolated_components, explicitly_considered_links, already_checked_components,
-                self.read_error_code_suggestion(anomalous_comp), anomalous_comp
+                unisolated_components, explicitly_considered_links, classified_components,
+                self.read_error_code_suggestion(anomalous_comp), anomalous_comp, prev_classified_components
             )
             print("explicitly considered links:", explicitly_considered_links)
             edges = []
             for k in explicitly_considered_links.keys():
-                if already_checked_components[k][0]:
+                if (k in classified_components and classified_components[k][0]
+                        or k in prev_classified_components and prev_classified_components[k][0]):  # k has anomaly
                     for v in explicitly_considered_links[k]:
-                        if already_checked_components[v][0]:
+                        if (v in classified_components and classified_components[v][0]
+                                or v in prev_classified_components and prev_classified_components[v][
+                                    0]):  # v has anomaly
                             edges.append(k + " -> " + v)
 
             edges = edges[::-1]  # has to be reversed, affected-by direction
@@ -560,16 +619,15 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 anomaly_graph[start].append(end)
 
             fault_paths = self.find_all_longest_paths(anomaly_graph)
-            print("first comp isolated - FAULT PATHS:")
-            for fp in fault_paths:
-                print(fp)
 
             # handle one-component-paths
             all_previous_paths = list(already_found_fault_paths.values())
             if len(all_previous_paths) > 0:
                 all_previous_paths = all_previous_paths[0][0]
             for k in explicitly_considered_links.keys():
-                if already_checked_components[k][0] and k not in " ".join(edges):  # unconsidered anomaly
+                if ((k in classified_components and classified_components[k][0]
+                     or k in prev_classified_components and prev_classified_components[k][0])
+                        and k not in " ".join(edges)):  # unconsidered anomaly
                     if not any(k in i for i in all_previous_paths):  # also not part of previous paths
                         fault_paths.append([k])
 

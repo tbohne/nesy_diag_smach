@@ -24,13 +24,14 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
     is entered into the knowledge graph.
     """
 
-    def __init__(self, data_accessor: DataAccessor, data_provider: DataProvider, kg_url: str) -> None:
+    def __init__(self, data_accessor: DataAccessor, data_provider: DataProvider, kg_url: str, verbose: bool) -> None:
         """
         Initializes the state.
 
         :param data_accessor: implementation of the data accessor interface
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self,
                              outcomes=['processed_fault_context'],
@@ -39,17 +40,18 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
         self.data_accessor = data_accessor
         self.data_provider = data_provider
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
+        self.verbose = verbose
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("READ_FAULT_CONTEXT_AND_GEN_ONTOLOGY_INSTANCES", "yellow", "on_grey", ["bold"]),
-              "state..")
-        print("############################################")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("READ_FAULT_CONTEXT_AND_GEN_ONTOLOGY_INSTANCES", "yellow", "on_grey", ["bold"]),
+                  "state..")
+            print("############################################")
 
     @staticmethod
     def write_fault_context_to_session_file(fault_context: FaultContext) -> None:

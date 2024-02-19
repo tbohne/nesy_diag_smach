@@ -32,7 +32,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
 
     def __init__(
             self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider,
-            kg_url: str = KG_URL
+            kg_url: str = KG_URL, verbose: bool = True
     ) -> None:
         """
         Initializes the neuro-symbolic diagnosis state machine.
@@ -41,6 +41,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
         :param model_accessor: implementation of the model accessor interface
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         super(NeuroSymbolicDiagnosisStateMachine, self).__init__(
             outcomes=['diag', 'refuted_hypothesis'],
@@ -52,10 +53,13 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
         self.data_provider = data_provider
         self.userdata.sm_input = []
         self.kg_url = kg_url
+        self.verbose = verbose
 
         with self:
             self.add('READ_FAULT_CONTEXT_AND_GEN_ONTOLOGY_INSTANCES',
-                     ReadFaultContextAndGenOntologyInstances(self.data_accessor, self.data_provider, self.kg_url),
+                     ReadFaultContextAndGenOntologyInstances(
+                         self.data_accessor, self.data_provider, self.kg_url, self.verbose
+                     ),
                      transitions={'processed_fault_context': 'SELECT_UNUSED_ERROR_CODE'},
                      remapping={'input': 'sm_input', 'user_data': 'sm_input'})
 

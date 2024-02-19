@@ -21,12 +21,13 @@ class SuggestSuspectComponents(smach.State):
     diag subject are suggested to be investigated based on the available information.
     """
 
-    def __init__(self, data_provider: DataProvider, kg_url: str) -> None:
+    def __init__(self, data_provider: DataProvider, kg_url: str, verbose: bool) -> None:
         """
         Initializes the state.
 
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self,
                              outcomes=['provided_suggestions'],
@@ -34,16 +35,17 @@ class SuggestSuspectComponents(smach.State):
                              output_keys=['suggestion_list'])
         self.data_provider = data_provider
         self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url)
+        self.verbose = verbose
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("SUGGEST_SUSPECT_COMPONENTS", "yellow", "on_grey", ["bold"]), "state..")
-        print("############################################\n")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("SUGGEST_SUSPECT_COMPONENTS", "yellow", "on_grey", ["bold"]), "state..")
+            print("############################################\n")
 
     @staticmethod
     def write_components_to_file(suspect_components: List[str]) -> None:
@@ -88,7 +90,8 @@ class SuggestSuspectComponents(smach.State):
         for comp in suspect_components:
             # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
             use = True  # self.qt.query_sensor_usage_by_suspect_component(comp)[0]
-            print("comp:", comp, "// use sensor:", use)
+            if self.verbose:
+                print("comp:", comp, "// use sensor:", use)
             sensor_usage.append(use)
         return sensor_usage
 
@@ -141,17 +144,19 @@ class SuggestSuspectComponents(smach.State):
             self.write_components_to_file(suspect_components)
         else:
             suspect_components = self.read_components_from_file()
-        print(colored("SUSPECT COMPONENTS: " + str(suspect_components) + "\n", "green", "on_grey", ["bold"]))
+        if self.verbose:
+            print(colored("SUSPECT COMPONENTS: " + str(suspect_components) + "\n", "green", "on_grey", ["bold"]))
         self.write_suggestions_to_session_file(userdata.selected_instance, suspect_components)
         sensor_usage = self.determine_sensor_usage(suspect_components)
         suggestions = self.gen_suggestions(userdata.selected_instance, suspect_components, sensor_usage)
         userdata.suggestion_list = suggestions
         self.update_session_file(suspect_components, suggestions)
 
-        if True in sensor_usage:
-            print("\n--> there is at least one suspect component that can be diagnosed using a sensor signal..")
-        else:
-            print("\n--> none of the identified suspect components can be diagnosed with a sensor signal..")
+        if self.verbose:
+            if True in sensor_usage:
+                print("\n--> there is at least one suspect component that can be diagnosed using a sensor signal..")
+            else:
+                print("\n--> none of the identified suspect components can be diagnosed with a sensor signal..")
 
         self.data_provider.provide_state_transition(StateTransition(
             "SUGGEST_SUSPECT_COMPONENTS", "CLASSIFY_COMPONENTS", "provided_suggestions"

@@ -19,26 +19,28 @@ class NoProblemDetectedCheckSensor(smach.State):
     state.
     """
 
-    def __init__(self, data_accessor: DataAccessor, data_provider: DataProvider) -> None:
+    def __init__(self, data_accessor: DataAccessor, data_provider: DataProvider, verbose: bool) -> None:
         """
         Initializes the state.
 
         :param data_accessor: implementation of the data accessor interface
         :param data_provider: implementation of the data provider interface
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self, outcomes=['sensor_works', 'sensor_defective'], input_keys=[''], output_keys=[''])
         self.data_accessor = data_accessor
         self.data_provider = data_provider
+        self.verbose = verbose
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("NO_PROBLEM_DETECTED_CHECK_SENSOR", "yellow", "on_grey", ["bold"]), "state..")
-        print("############################################")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("NO_PROBLEM_DETECTED_CHECK_SENSOR", "yellow", "on_grey", ["bold"]), "state..")
+            print("############################################")
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """

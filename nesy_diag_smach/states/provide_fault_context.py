@@ -21,27 +21,29 @@ class ProvideFaultContext(smach.State):
     the context of the diagnostic process is provided due to unmanageable uncertainty.
     """
 
-    def __init__(self, data_provider: DataProvider, kg_url: str) -> None:
+    def __init__(self, data_provider: DataProvider, kg_url: str, verbose: bool) -> None:
         """
         Initializes the state.
 
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self, outcomes=['no_diag'], input_keys=[''], output_keys=[''])
         self.data_provider = data_provider
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
         self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url)
+        self.verbose = verbose
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("PROVIDE_FAULT_CONTEXT", "yellow", "on_grey", ["bold"]), "state..")
-        print("############################################")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("PROVIDE_FAULT_CONTEXT", "yellow", "on_grey", ["bold"]), "state..")
+            print("############################################")
 
     @staticmethod
     def read_metadata() -> Dict[str, Union[int, str]]:

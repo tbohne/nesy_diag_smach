@@ -30,7 +30,7 @@ class ClassifyComponents(smach.State):
     """
 
     def __init__(self, model_accessor: ModelAccessor, data_accessor: DataAccessor, data_provider: DataProvider,
-                 kg_url: str) -> None:
+                 kg_url: str, verbose: bool) -> None:
         """
         Initializes the state.
 
@@ -38,6 +38,7 @@ class ClassifyComponents(smach.State):
         :param data_accessor: implementation of the data accessor interface
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self,
                              outcomes=['detected_anomalies', 'no_anomaly', 'no_anomaly_no_more_comp'],
@@ -47,6 +48,7 @@ class ClassifyComponents(smach.State):
         self.data_accessor = data_accessor
         self.data_provider = data_provider
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
+        self.verbose = verbose
 
     @staticmethod
     def log_classification_actions(
@@ -73,20 +75,19 @@ class ClassifyComponents(smach.State):
         with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "w") as f:
             json.dump(log_file, f, indent=4)
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("CLASSIFY_COMPONENTS", "yellow", "on_grey", ["bold"]),
-              "state (applying trained model)..")
-        print("############################################")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("CLASSIFY_COMPONENTS", "yellow", "on_grey", ["bold"]),
+                  "state (applying trained model)..")
+            print("############################################")
 
-    @staticmethod
     def perform_synchronized_sensor_recordings(
-            suggestion_list: Dict[str, Tuple[str, bool]]
+            self, suggestion_list: Dict[str, Tuple[str, bool]]
     ) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         Performs synchronized sensor recordings based on the provided suggestion list.
@@ -97,17 +98,17 @@ class ClassifyComponents(smach.State):
         """
         components_to_be_recorded = {k: v[0] for k, v in suggestion_list.items() if v[1]}
         components_to_be_manually_verified = {k: v[0] for k, v in suggestion_list.items() if not v[1]}
-        print("------------------------------------------")
-        print("components to be recorded:", components_to_be_recorded)
-        print("components to be verified manually:", components_to_be_manually_verified)
-        print("------------------------------------------")
-        print(colored("\nperform synchronized sensor recordings at:", "green", "on_grey", ["bold"]))
-        for comp in components_to_be_recorded.keys():
-            print(colored("- " + comp, "green", "on_grey", ["bold"]))
+        if self.verbose:
+            print("------------------------------------------")
+            print("components to be recorded:", components_to_be_recorded)
+            print("components to be verified manually:", components_to_be_manually_verified)
+            print("------------------------------------------")
+            print(colored("\nperform synchronized sensor recordings at:", "green", "on_grey", ["bold"]))
+            for comp in components_to_be_recorded.keys():
+                print(colored("- " + comp, "green", "on_grey", ["bold"]))
         return components_to_be_recorded, components_to_be_manually_verified
 
-    @staticmethod
-    def log_corresponding_error_code(sensor_data: SensorData) -> None:
+    def log_corresponding_error_code(self, sensor_data: SensorData) -> None:
         """
         Logs the corresponding error code to set the heatmaps for, i.e., reads the error code suggestion.
         Assumption: it is always the latest suggestion.
@@ -119,7 +120,8 @@ class ClassifyComponents(smach.State):
         assert sensor_data.comp_name in list(suggestions.values())[0]
         assert len(suggestions.keys()) == 1
         dtc = list(suggestions.keys())[0]
-        print("error code to set heatmap for:", dtc)
+        if self.verbose:
+            print("error code to set heatmap for:", dtc)
 
     def process_sensor_recordings(
             self, sensor_recordings: List[SensorData], suggestion_list: Dict[str, Tuple[str, bool]],
@@ -138,7 +140,8 @@ class ClassifyComponents(smach.State):
         """
         for sensor_rec in sensor_recordings:  # iteratively process parallel recorded sensor signals
             sensor_rec_id = self.instance_gen.extend_knowledge_graph_with_time_series(sensor_rec.time_series)
-            print(colored("\n\nclassifying:" + sensor_rec.comp_name, "green", "on_grey", ["bold"]))
+            if self.verbose:
+                print(colored("\n\nclassifying:" + sensor_rec.comp_name, "green", "on_grey", ["bold"]))
             values = sensor_rec.time_series
 
             model = self.model_accessor.get_keras_univariate_ts_classification_model_by_component(sensor_rec.comp_name)
@@ -170,7 +173,8 @@ class ClassifyComponents(smach.State):
             heatmaps = util.gen_heatmaps(net_input, model, prediction)
             res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(pred_value) + "]"
             self.log_corresponding_error_code(sensor_rec)
-            print("heatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
+            if self.verbose:
+                print("heatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
 
             # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
             heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
@@ -197,7 +201,8 @@ class ClassifyComponents(smach.State):
         :param non_anomalous_components: list of regular components (to be extended)
         """
         for comp in components_to_be_manually_verified.keys():
-            print(colored("\n\nmanual inspection of component " + comp, "green", "on_grey", ["bold"]))
+            if self.verbose:
+                print(colored("\n\nmanual inspection of component " + comp, "green", "on_grey", ["bold"]))
             anomaly = self.data_accessor.get_manual_judgement_for_component(comp)
             classification_id = self.instance_gen.extend_knowledge_graph_with_manual_inspection(
                 anomaly, components_to_be_manually_verified[comp], comp

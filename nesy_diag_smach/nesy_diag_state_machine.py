@@ -63,42 +63,46 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
                      transitions={'processed_fault_context': 'SELECT_UNUSED_ERROR_CODE'},
                      remapping={'input': 'sm_input', 'user_data': 'sm_input'})
 
-            self.add('SELECT_UNUSED_ERROR_CODE', SelectUnusedErrorCode(self.data_provider),
+            self.add('SELECT_UNUSED_ERROR_CODE', SelectUnusedErrorCode(self.data_provider, self.verbose),
                      transitions={'selected_best_instance': 'SUGGEST_SUSPECT_COMPONENTS',
                                   'no_instance': 'NO_PROBLEM_DETECTED_CHECK_SENSOR'},
                      remapping={'selected_instance': 'sm_input'})
 
             self.add('ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS',
                      IsolateProblemCheckEffectiveRadius(
-                         self.data_accessor, self.model_accessor, self.data_provider, self.kg_url
+                         self.data_accessor, self.model_accessor, self.data_provider, self.kg_url, self.verbose
                      ),
                      transitions={'isolated_problem': 'PROVIDE_DIAG_AND_SHOW_TRACE',
                                   'isolated_problem_remaining_error_codes': 'SELECT_UNUSED_ERROR_CODE'},
                      remapping={'classified_components': 'sm_input', 'fault_paths': 'sm_input'})
 
             self.add('NO_PROBLEM_DETECTED_CHECK_SENSOR',
-                     NoProblemDetectedCheckSensor(self.data_accessor, self.data_provider),
+                     NoProblemDetectedCheckSensor(self.data_accessor, self.data_provider, self.verbose),
                      transitions={'sensor_works': 'PROVIDE_FAULT_CONTEXT',
                                   'sensor_defective': 'PROVIDE_DIAG_AND_SHOW_TRACE'},
                      remapping={})
 
             self.add('PROVIDE_FAULT_CONTEXT',
-                     ProvideFaultContext(self.data_provider, self.kg_url),
+                     ProvideFaultContext(self.data_provider, self.kg_url, self.verbose),
                      transitions={'no_diag': 'refuted_hypothesis'},
                      remapping={})
 
-            self.add('PROVIDE_DIAG_AND_SHOW_TRACE', ProvideDiagAndShowTrace(self.data_provider, self.kg_url),
+            self.add('PROVIDE_DIAG_AND_SHOW_TRACE',
+                     ProvideDiagAndShowTrace(self.data_provider, self.kg_url, self.verbose),
                      transitions={'uploaded_diag': 'diag'},
                      remapping={'diagnosis': 'sm_input', 'final_output': 'final_output'})
 
             self.add('CLASSIFY_COMPONENTS',
-                     ClassifyComponents(self.model_accessor, self.data_accessor, self.data_provider, self.kg_url),
+                     ClassifyComponents(
+                         self.model_accessor, self.data_accessor, self.data_provider, self.kg_url, self.verbose
+                     ),
                      transitions={'no_anomaly_no_more_comp': 'SELECT_UNUSED_ERROR_CODE',
                                   'no_anomaly': 'SUGGEST_SUSPECT_COMPONENTS',
                                   'detected_anomalies': 'ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS'},
                      remapping={'suggestion_list': 'sm_input', 'classified_components': 'sm_input'})
 
-            self.add('SUGGEST_SUSPECT_COMPONENTS', SuggestSuspectComponents(self.data_provider, self.kg_url),
+            self.add('SUGGEST_SUSPECT_COMPONENTS',
+                     SuggestSuspectComponents(self.data_provider, self.kg_url, self.verbose),
                      transitions={'provided_suggestions': 'CLASSIFY_COMPONENTS'},
                      remapping={'selected_instance': 'sm_input', 'suggestion_list': 'sm_input'})
 

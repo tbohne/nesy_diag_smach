@@ -37,7 +37,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
     """
 
     def __init__(
-            self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider, kg_url: str
+            self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider, kg_url: str,
+            verbose: bool
     ) -> None:
         """
         Initializes the state.
@@ -46,6 +47,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param model_accessor: implementation of the model accessor interface
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self,
                              outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
@@ -56,6 +58,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         self.data_accessor = data_accessor
         self.model_accessor = model_accessor
         self.data_provider = data_provider
+        self.verbose = verbose
 
     @staticmethod
     def create_session_data_dir() -> None:
@@ -132,7 +135,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
         heatmaps = util.gen_heatmaps(net_input, model, prediction)
         res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(prediction[0][0]) + "]"
-        print("error code to set heatmap for:", error_code, "\nheatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
+        if self.verbose:
+            print("error code to set heatmap for:", error_code, "\nheatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
         # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
         heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
             "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
@@ -235,9 +239,11 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         """
         visualizations = []
         for key in anomalous_paths.keys():
-            print("isolation results, i.e., causal path:\n", key, ":", anomalous_paths[key])
+            if self.verbose:
+                print("isolation results, i.e., causal path:\n", key, ":", anomalous_paths[key])
         for key in complete_graphs.keys():
-            print("visualizing graph for component:", key, "\n")
+            if self.verbose:
+                print("visualizing graph for component:", key, "\n")
             plt.figure(figsize=(25, 18))
             plt.title("Causal Graph (Network of Effective Connections) for " + key, fontsize=24, fontweight='bold')
             from_relations = [k for k in complete_graphs[key].keys() for _ in range(len(complete_graphs[key][k]))]
@@ -290,15 +296,16 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "w") as f:
             json.dump(log_file, f, indent=4)
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "yellow", "on_grey", ["bold"]), "state..")
-        print("############################################\n")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "yellow", "on_grey", ["bold"]),
+                  "state..")
+            print("############################################\n")
 
     def retrieve_already_checked_components(self, classified_components: List[str]) -> Dict[str, Tuple[bool, str]]:
         """
@@ -377,7 +384,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param prev_classified_components: dict of already checked components (in previous iterations)
         """
         affecting_comps = self.qt.query_affected_by_relations_by_suspect_component(checked_comp)
-        print("component potentially affected by:", affecting_comps)
+        if self.verbose:
+            print("component potentially affected by:", affecting_comps)
         already_considered_anomaly_links = [comp for comp in explicitly_considered_links[checked_comp] if (
                 comp in classified_components and classified_components[comp][0]
                 or comp in prev_classified_components and prev_classified_components[comp][0]
@@ -403,7 +411,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         """
         while len(unisolated_comps) > 0:
             comp_to_be_checked = unisolated_comps.pop(0)
-            print(colored("\ncomponent to be checked: " + comp_to_be_checked, "green", "on_grey", ["bold"]))
+            if self.verbose:
+                print(colored("\ncomponent to be checked: " + comp_to_be_checked, "green", "on_grey", ["bold"]))
             if comp_to_be_checked not in list(explicitly_considered_links.keys()):
                 explicitly_considered_links[comp_to_be_checked] = []
 
@@ -413,7 +422,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                                       and classified_components[comp_to_be_checked][0]
                                       or comp_to_be_checked in prev_classified_components
                                       and prev_classified_components[comp_to_be_checked][0])
-                print("already checked this component - anomaly:", prev_found_anomaly)
+                if self.verbose:
+                    print("already checked this component - anomaly:", prev_found_anomaly)
                 if prev_found_anomaly:
                     self.handle_anomaly(
                         comp_to_be_checked, unisolated_comps, explicitly_considered_links, classified_components,
@@ -423,7 +433,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
             use_sensor_signal = True  # self.qt.query_sensor_signal_usage_by_suspect_component(comp_to_be_checked)[0]
             if use_sensor_signal:
-                print("use sensor signal..")
+                if self.verbose:
+                    print("use sensor signal..")
                 classification_res = self.classify_component(
                     comp_to_be_checked, error_code, classified_components[anomalous_comp][1]
                 )
@@ -508,9 +519,11 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 if path in filtered_paths:
                     final_dict[comp].append(path)
 
-        print("FINAL UNIQUE PATHS:")
+        if self.verbose:
+            print("FINAL UNIQUE PATHS:")
         for comp in final_dict.keys():
-            print(final_dict[comp])
+            if self.verbose:
+                print(final_dict[comp])
         return final_dict
 
     def find_paths_dfs(self, anomaly_graph, node, path=[]):
@@ -564,14 +577,16 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         # the components coming from the classification state are not supposed to be handled identical to the ones
         # classified before, the ones classified before are just to be considered as a lookup for classifications,
         # not triggering new classifications
-        print("ALREADY CHECKED COMPONENTS - CLASSIFICATION STATE:")
-        print(len(list(classified_components.keys())))
-        print("ALREADY CHECKED COMPONENTS - PREV ITERATIONS:")
-        print(prev_classified_components.keys())
+        if self.verbose:
+            print("ALREADY CHECKED COMPONENTS - CLASSIFICATION STATE:")
+            print(len(list(classified_components.keys())))
+            print("ALREADY CHECKED COMPONENTS - PREV ITERATIONS:")
+            print(prev_classified_components.keys())
 
         anomalous_paths = {}
-        print(colored("constructing causal graph, i.e., subgraph of structural component knowledge..\n",
-                      "green", "on_grey", ["bold"]))
+        if self.verbose:
+            print(colored("constructing causal graph, i.e., subgraph of structural component knowledge..\n",
+                          "green", "on_grey", ["bold"]))
         complete_graphs = {comp: self.construct_complete_graph({}, [comp])
                            for comp in classified_components.keys() if classified_components[comp][0]}
         explicitly_considered_links = {}
@@ -586,7 +601,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             # anomalous component is a new component (just classified in prev state)
             if not classified_components[anomalous_comp][0]:
                 continue  # already classified and no anomaly
-            print(colored("isolating " + anomalous_comp + "..", "green", "on_grey", ["bold"]))
+            if self.verbose:
+                print(colored("isolating " + anomalous_comp + "..", "green", "on_grey", ["bold"]))
             affecting_components = self.qt.query_affected_by_relations_by_suspect_component(anomalous_comp)
 
             if anomalous_comp not in list(explicitly_considered_links.keys()):
@@ -594,13 +610,15 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             else:
                 explicitly_considered_links[anomalous_comp] += affecting_components.copy()
 
-            print("component potentially affected by:", affecting_components)
+            if self.verbose:
+                print("component potentially affected by:", affecting_components)
             unisolated_components = affecting_components
             self.work_through_unisolated_components(
                 unisolated_components, explicitly_considered_links, classified_components,
                 self.read_error_code_suggestion(anomalous_comp), anomalous_comp, prev_classified_components
             )
-            print("explicitly considered links:", explicitly_considered_links)
+            if self.verbose:
+                print("explicitly considered links:", explicitly_considered_links)
             edges = []
             for k in explicitly_considered_links.keys():
                 if (k in classified_components and classified_components[k][0]
@@ -638,7 +656,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
         self.data_provider.provide_causal_graph_visualizations(visualizations)
         remaining_error_code_instances = util.load_error_code_instances()
-        print("REMAINING error codes:", remaining_error_code_instances)
+        if self.verbose:
+            print("REMAINING error codes:", remaining_error_code_instances)
         if len(remaining_error_code_instances) > 0:
             self.create_tmp_file_for_already_found_fault_paths(anomalous_paths)  # write anomalous paths to session file
             self.data_provider.provide_state_transition(StateTransition(

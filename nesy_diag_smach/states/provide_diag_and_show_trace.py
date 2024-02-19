@@ -23,27 +23,29 @@ class ProvideDiagAndShowTrace(smach.State):
     is entered into the knowledge graph.
     """
 
-    def __init__(self, data_provider: DataProvider, kg_url: str) -> None:
+    def __init__(self, data_provider: DataProvider, kg_url: str, verbose: bool) -> None:
         """
         Initializes the state.
 
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self, outcomes=['uploaded_diag'], input_keys=['diagnosis'], output_keys=['final_output'])
         self.data_provider = data_provider
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
         self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url)
+        self.verbose = verbose
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("PROVIDE_DIAG_AND_SHOW_TRACE", "yellow", "on_grey", ["bold"]), "state..")
-        print("############################################")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("PROVIDE_DIAG_AND_SHOW_TRACE", "yellow", "on_grey", ["bold"]), "state..")
+            print("############################################")
 
     @staticmethod
     def construct_fault_paths(diagnosis: Dict[str, List[List[str]]], anomalous_comp: str) -> List[str]:
@@ -116,7 +118,8 @@ class ProvideDiagAndShowTrace(smach.State):
         fault_paths = {}
 
         for key in userdata.diagnosis.keys():
-            print("\nidentified anomalous component:", key)
+            if self.verbose:
+                print("\nidentified anomalous component:", key)
             branching_paths = self.construct_fault_paths(userdata.diagnosis, key)
             fault_condition_id = self.retrieve_fault_condition_id()
             for branching_path in branching_paths:

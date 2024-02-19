@@ -21,17 +21,19 @@ class SelectUnusedErrorCode(smach.State):
     selected for further processing.
     """
 
-    def __init__(self, data_provider: DataProvider) -> None:
+    def __init__(self, data_provider: DataProvider, verbose: bool) -> None:
         """
         Initializes the state.
 
         :param data_provider: implementation of the data provider interface
+        :param verbose: whether the state machine should log its state, transitions, etc.
         """
         smach.State.__init__(self,
                              outcomes=['selected_best_instance', 'no_instance'],
                              input_keys=[''],
                              output_keys=['selected_instance'])
         self.data_provider = data_provider
+        self.verbose = verbose
 
     @staticmethod
     def remove_error_code_instance_from_tmp_file(remaining_instances: List[str]) -> None:
@@ -43,15 +45,15 @@ class SelectUnusedErrorCode(smach.State):
         with open(SESSION_DIR + "/" + ERROR_CODE_TMP_FILE, "w") as f:
             json.dump({'list': remaining_instances}, f, default=str)
 
-    @staticmethod
-    def log_state_info() -> None:
+    def log_state_info(self) -> None:
         """
         Logs the state information.
         """
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("\n\n############################################")
-        print("executing", colored("SELECT_UNUSED_ERROR_CODE", "yellow", "on_grey", ["bold"]), "state..")
-        print("############################################")
+        if self.verbose:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("\n\n############################################")
+            print("executing", colored("SELECT_UNUSED_ERROR_CODE", "yellow", "on_grey", ["bold"]), "state..")
+            print("############################################")
 
     def remaining_error_codes(self, error_code_list: List[str], selected_error_code: str) -> None:
         """
@@ -62,7 +64,8 @@ class SelectUnusedErrorCode(smach.State):
         """
         error_code_list.remove(selected_error_code)
         self.remove_error_code_instance_from_tmp_file(error_code_list)
-        print(colored("selected error code instance: " + selected_error_code, "green", "on_grey", ["bold"]))
+        if self.verbose:
+            print(colored("selected error code instance: " + selected_error_code, "green", "on_grey", ["bold"]))
         self.data_provider.provide_state_transition(StateTransition(
             "SELECT_UNUSED_ERROR_CODE", "SUGGEST_SUSPECT_COMPONENTS", "selected_best_instance"
         ))

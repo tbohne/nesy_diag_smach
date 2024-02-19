@@ -583,7 +583,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         # important to compare to userdata here to not have a dictionary of changed size during iteration
         for class_id in userdata.classified_components:
             anomalous_comp = self.retrieve_sus_comp(class_id)
-            # anomalous component ia a new component (just classified in prev state)
+            # anomalous component is a new component (just classified in prev state)
             if not classified_components[anomalous_comp][0]:
                 continue  # already classified and no anomaly
             print(colored("isolating " + anomalous_comp + "..", "green", "on_grey", ["bold"]))

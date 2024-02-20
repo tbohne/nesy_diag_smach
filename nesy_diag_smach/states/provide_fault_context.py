@@ -31,8 +31,8 @@ class ProvideFaultContext(smach.State):
         """
         smach.State.__init__(self, outcomes=['no_diag'], input_keys=[''], output_keys=[''])
         self.data_provider = data_provider
-        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
-        self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url)
+        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
+        self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
 
     def log_state_info(self) -> None:

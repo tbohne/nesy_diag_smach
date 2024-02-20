@@ -39,7 +39,7 @@ class ReadFaultContextAndGenOntologyInstances(smach.State):
                              output_keys=['diag_subject_specific_instance_data'])
         self.data_accessor = data_accessor
         self.data_provider = data_provider
-        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
+        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
 
     def log_state_info(self) -> None:

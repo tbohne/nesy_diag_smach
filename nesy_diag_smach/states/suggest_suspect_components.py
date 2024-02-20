@@ -34,7 +34,7 @@ class SuggestSuspectComponents(smach.State):
                              input_keys=['selected_instance'],
                              output_keys=['suggestion_list'])
         self.data_provider = data_provider
-        self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url)
+        self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
 
     def log_state_info(self) -> None:

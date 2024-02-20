@@ -47,7 +47,7 @@ class ClassifyComponents(smach.State):
         self.model_accessor = model_accessor
         self.data_accessor = data_accessor
         self.data_provider = data_provider
-        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
+        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
 
     @staticmethod
@@ -149,7 +149,7 @@ class ClassifyComponents(smach.State):
                 util.no_trained_model_available(sensor_rec, suggestion_list)
                 continue
             (model, model_meta_info) = model  # not only obtain the model here, but also meta info
-            values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values)
+            values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
             try:
                 util.validate_keras_model(model)
             except ValueError as e:
@@ -157,17 +157,19 @@ class ClassifyComponents(smach.State):
                 continue
 
             net_input = util.construct_net_input(model, values)
-            prediction = model.predict(np.array([net_input]))
+            prediction = model.predict(np.array([net_input]), verbose=self.verbose)
             num_classes = len(prediction[0])
             # addresses both models with one output neuron and those with several
             anomaly = np.argmax(prediction) == 0 if num_classes > 1 else prediction[0][0] <= 0.5
             pred_value = prediction.max() if num_classes > 1 else prediction[0][0]
 
             if anomaly:
-                util.log_anomaly(pred_value)
+                if self.verbose:
+                    util.log_anomaly(pred_value)
                 anomalous_components.append(sensor_rec.comp_name)
             else:
-                util.log_regular(pred_value)
+                if self.verbose:
+                    util.log_regular(pred_value)
                 non_anomalous_components.append(sensor_rec.comp_name)
 
             heatmaps = util.gen_heatmaps(net_input, model, prediction)
@@ -180,7 +182,10 @@ class ClassifyComponents(smach.State):
             heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
                 "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
             )
-            heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), sensor_rec.comp_name + res_str)
+            # TODO: should be real time values at some point
+            time_values = [i for i in range(len(values))]
+            heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), sensor_rec.comp_name + res_str,
+                                                      time_values)
             self.data_provider.provide_heatmaps(heatmap_img, sensor_rec.comp_name + res_str)
             classification_id = self.instance_gen.extend_knowledge_graph_with_signal_classification(
                 anomaly, components_to_be_recorded[sensor_rec.comp_name], sensor_rec.comp_name, pred_value,

@@ -20,8 +20,13 @@ class LocalDataProvider(DataProvider):
     Implementation of the data provider interface.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, verbose: bool = False):
+        """
+        Initializes the local data provider.
+
+        :param verbose: sets verbosity of data provider
+        """
+        self.verbose = verbose
 
     def provide_causal_graph_visualizations(self, visualizations: List[Image.Image]) -> None:
         """
@@ -61,14 +66,16 @@ class LocalDataProvider(DataProvider):
 
         ground_truth_fault_paths = problem_instance["ground_truth_fault_paths"]
         determined_fault_paths = [path.split(" -> ") for path in fault_paths]
-        print("#####################################################################")
-        print("GROUND TRUTH FAULT PATHS:", ground_truth_fault_paths)
-        print("DETERMINED FAULT PATHS:", determined_fault_paths)
-        print("#####################################################################")
+        if self.verbose:
+            print("#####################################################################")
+            print("GROUND TRUTH FAULT PATHS:", ground_truth_fault_paths)
+            print("DETERMINED FAULT PATHS:", determined_fault_paths)
+            print("#####################################################################")
 
         assert len(ground_truth_fault_paths) == len(fault_paths)
         assert all(gtfp in determined_fault_paths for gtfp in ground_truth_fault_paths)
-        print("all processed...")
+        if self.verbose:
+            print("all processed...")
 
         for fault_path in fault_paths:
             print(colored(fault_path, "red", "on_white", ["bold"]))
@@ -79,6 +86,7 @@ class LocalDataProvider(DataProvider):
 
         :param state_transition: state transition (prev state -- (transition link) --> current state)
         """
-        print("-----------------------------------------------------------")
-        print("Performed state transition:", state_transition)
-        print("-----------------------------------------------------------")
+        if self.verbose:
+            print("-----------------------------------------------------------")
+            print("Performed state transition:", state_transition)
+            print("-----------------------------------------------------------")

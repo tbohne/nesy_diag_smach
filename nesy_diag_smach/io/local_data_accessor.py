@@ -19,8 +19,13 @@ class LocalDataAccessor(DataAccessor):
     Implementation of the data accessor interface using local files.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, verbose: bool = False):
+        """
+        Initializes the local data accessor.
+
+        :param verbose: sets verbosity of data accessor
+        """
+        self.verbose = verbose
 
     def get_fault_context(self) -> FaultContext:
         """
@@ -60,7 +65,8 @@ class LocalDataAccessor(DataAccessor):
             problem_instance = json.load(f)
 
         for comp in components:
-            print("GROUND TRUTH ANOMALY:", problem_instance["suspect_components"][comp][0])
+            if self.verbose:
+                print("GROUND TRUTH ANOMALY:", problem_instance["suspect_components"][comp][0])
             anomaly_suffix = "NEG" if problem_instance["suspect_components"][comp][0] else "POS"
             path = "res/" + SIGNAL_SESSION_FILES + "/" + comp + "/dummy_signal_" + anomaly_suffix + ".csv"
             _, values = preprocess.read_oscilloscope_recording(path)
@@ -74,7 +80,8 @@ class LocalDataAccessor(DataAccessor):
         :param component: component to get manual judgement for
         :return: true -> anomaly, false -> regular
         """
-        print("local interface impl.: manual inspection of component:", component)
+        if self.verbose:
+            print("local interface impl.: manual inspection of component:", component)
         val = ""
         while val not in ['0', '1']:
             val = input("\nsim human - press '0' for defective component, i.e., anomaly, and '1' for no defect..")
@@ -86,7 +93,8 @@ class LocalDataAccessor(DataAccessor):
 
         :return: true -> anomaly, false -> regular
         """
-        print("no anomaly identified -- check potential sensor malfunction..")
+        if self.verbose:
+            print("no anomaly identified -- check potential sensor malfunction..")
         val = ""
         while val not in ['0', '1']:
             val = input("\npress '0' for sensor malfunction and '1' for working sensor..")

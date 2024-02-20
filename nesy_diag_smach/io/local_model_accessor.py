@@ -15,8 +15,13 @@ class LocalModelAccessor(ModelAccessor):
     Implementation of the model accessor interface using local model files.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, verbose: bool = False):
+        """
+        Initializes the local model accessor.
+
+        :param verbose: sets verbosity of model accessor
+        """
+        self.verbose = verbose
 
     def get_keras_univariate_ts_classification_model_by_component(
             self, component: str
@@ -35,7 +40,8 @@ class LocalModelAccessor(ModelAccessor):
         """
         try:
             trained_model_file = TRAINED_MODEL_POOL + component + ".h5"
-            print("loading trained model:", trained_model_file)
+            if self.verbose:
+                print("loading trained model:", trained_model_file)
             model_meta_info = {
                 "normalization_method": "z_norm",
                 "model_id": "keras_univariate_ts_classification_model_001"

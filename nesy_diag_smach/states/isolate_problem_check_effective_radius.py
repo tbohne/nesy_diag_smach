@@ -53,8 +53,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                              outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
                              input_keys=['classified_components'],
                              output_keys=['fault_paths'])
-        self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url)
-        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url)
+        self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url, verbose=verbose)
+        self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.data_accessor = data_accessor
         self.model_accessor = model_accessor
         self.data_provider = data_provider
@@ -100,7 +100,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param values: classified time series values
         """
         title = affecting_comp + "_" + res_str
-        heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), title)
+        # TODO: should be real time values at some point
+        time_vals = [i for i in range(len(values))]
+        heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), title, time_vals)
         self.data_provider.provide_heatmaps(heatmap_img, title)
 
     def classify_component(
@@ -121,17 +123,18 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         values = sensor_signals[0].time_series
         signal_id = self.instance_gen.extend_knowledge_graph_with_time_series(values)
         model, model_meta_info = self.get_model_and_metadata(affecting_comp)
-        values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values)
+        values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
         net_input = util.construct_net_input(model, values)
-        prediction = model.predict(np.array([net_input]))
+        prediction = model.predict(np.array([net_input]), verbose=self.verbose)
         num_classes = len(prediction[0])
         # addresses both models with one output neuron and those with several
         anomaly = np.argmax(prediction) == 0 if num_classes > 1 else prediction[0][0] <= 0.5
 
-        if anomaly:
-            util.log_anomaly(prediction[0][0])
-        else:
-            util.log_regular(prediction[0][0])
+        if self.verbose:
+            if anomaly:
+                util.log_anomaly(prediction[0][0])
+            else:
+                util.log_regular(prediction[0][0])
 
         heatmaps = util.gen_heatmaps(net_input, model, prediction)
         res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(prediction[0][0]) + "]"
@@ -495,9 +498,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param paths: dict of identified fault paths
         :return: filtered dict of fault paths
         """
-        print("FINDING UNIQUE PATHS:")
-        for path in paths.keys():
-            print(paths[path])
+        if self.verbose:
+            print("FINDING UNIQUE PATHS:")
+            for path in paths.keys():
+                print(paths[path])
 
         # a fault path that is found based on several components is only stored
         # under the one it was first found with

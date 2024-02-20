@@ -41,7 +41,7 @@ def validate_keras_model(model: keras.models.Model) -> None:
 
 
 def preprocess_time_series_based_on_model_meta_info(
-        model_meta_info: Dict[str, str], values: List[float]
+        model_meta_info: Dict[str, str], values: List[float], verbose: bool = True
 ) -> List[float]:
     """
     Preprocesses the time series based on model metadata (e.g. normalization method).
@@ -50,9 +50,11 @@ def preprocess_time_series_based_on_model_meta_info(
 
     :param model_meta_info: metadata for the trained model (e.g. normalization method)
     :param values: raw input (time series values)
+    :param verbose: whether terminal logs should be enabled
     :return: preprocessed input (voltage values)
     """
-    print("model meta info:", model_meta_info)
+    if verbose:
+        print("model meta info:", model_meta_info)
     if model_meta_info["normalization_method"] == "z_norm":
         return preprocess.z_normalize_time_series(values)
     elif model_meta_info["normalization_method"] == "min_max_norm":
@@ -137,7 +139,8 @@ def gen_heatmaps(net_input: np.ndarray, model: keras.models.Model, prediction: n
     """
     return {"tf-keras-gradcam": cam.tf_keras_gradcam(np.array([net_input]), model, prediction),
             "tf-keras-gradcam++": cam.tf_keras_gradcam_plus_plus(np.array([net_input]), model, prediction),
-            "tf-keras-scorecam": cam.tf_keras_scorecam(np.array([net_input]), model, prediction),
+            # TODO: not using that for the moment, leads to unwanted progress logs to terminal
+            # "tf-keras-scorecam": cam.tf_keras_scorecam(np.array([net_input]), model, prediction),
             "tf-keras-layercam": cam.tf_keras_layercam(np.array([net_input]), model, prediction)}
 
 

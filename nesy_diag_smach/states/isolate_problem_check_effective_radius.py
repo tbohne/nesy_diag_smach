@@ -676,7 +676,15 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             ))
             return "isolated_problem_remaining_error_codes"
 
-        already_found_fault_paths.update(anomalous_paths)  # merge dictionaries (already found + new ones)
+        # merge dictionaries (already found + new ones)
+        for k in anomalous_paths:
+            if k in already_found_fault_paths:  # update values
+                for v in anomalous_paths[k]:
+                    if v not in already_found_fault_paths[k]:
+                        already_found_fault_paths[k].append(v)
+            else:
+                already_found_fault_paths[k] = anomalous_paths[k]
+
         userdata.fault_paths = self.find_unique_longest_paths_over_dict(already_found_fault_paths)
         self.data_provider.provide_state_transition(StateTransition(
             "ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "PROVIDE_DIAG_AND_SHOW_TRACE", "isolated_problem"

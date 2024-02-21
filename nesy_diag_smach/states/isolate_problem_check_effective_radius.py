@@ -472,7 +472,13 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         if os.path.exists(SESSION_DIR + "/" + FAULT_PATH_TMP_FILE):
             with open(SESSION_DIR + "/" + FAULT_PATH_TMP_FILE, "r") as f:
                 existing_data = json.load(f)
-            existing_data.update(fault_paths)
+                for k in fault_paths:
+                    if k in existing_data:  # update values
+                        for v in fault_paths[k]:
+                            if v not in existing_data[k]:
+                                existing_data[k].append(v)
+                    else:
+                        existing_data[k] = fault_paths[k]
         else:
             existing_data = fault_paths
         with open(SESSION_DIR + "/" + FAULT_PATH_TMP_FILE, "w") as f:

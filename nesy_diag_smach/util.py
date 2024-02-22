@@ -30,14 +30,16 @@ def validate_keras_model(model: keras.models.Model) -> None:
     in_shape = model.input_shape
     out_shape = model.output_shape
     expected_in_shape = (None, in_shape[1], 1)
-    expected_out_shape = (None, 1)
+    expected_out_shape_one_neuron = (None, 1)
+    expected_out_shape_two_neurons = (None, 2)
 
     if len(in_shape) != len(expected_in_shape) or any(dim1 != dim2 for dim1, dim2 in zip(in_shape, expected_in_shape)):
         raise ValueError(f"unexpected input shape - expected: {expected_in_shape}, got: {in_shape}")
 
-    if len(out_shape) != len(expected_out_shape) \
-            or any(dim1 != dim2 for dim1, dim2 in zip(out_shape, expected_out_shape)):
-        raise ValueError(f"unexpected output shape - expected: {expected_out_shape}, got: {out_shape}")
+    if len(out_shape) != len(expected_out_shape_one_neuron) \
+            or (any(dim1 != dim2 for dim1, dim2 in zip(out_shape, expected_out_shape_one_neuron))
+                and any(dim1 != dim2 for dim1, dim2 in zip(out_shape, expected_out_shape_two_neurons))):
+        raise ValueError(f"unexpected output shape: {out_shape}")
 
 
 def preprocess_time_series_based_on_model_meta_info(

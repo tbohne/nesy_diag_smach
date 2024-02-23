@@ -4,7 +4,7 @@
 
 KG_URL = "http://127.0.0.1:3030"
 SESSION_DIR = "session_files"
-SIGNAL_SESSION_FILES = "dummy_signals"
+SIGNAL_SESSION_FILES = "test_signals"
 SUGGESTION_SESSION_FILE = "session_suggestions.json"
 CLASSIFICATION_LOG_FILE = "classifications.json"
 FAULT_CONTEXT_INPUT_FILE = "res/10_1_20_100_100_50_42.json"

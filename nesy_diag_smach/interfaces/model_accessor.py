@@ -30,3 +30,13 @@ class ModelAccessor(ABC):
         :return: trained model and model meta info dictionary or `None` if unavailable
         """
         pass
+
+    @abstractmethod
+    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> float:
+        """
+        Retrieves a simulated model accuracy to randomly classify signals of the specified component.
+
+        :param component: component to retrieve simulated model for
+        :return: simulated model accuracy
+        """
+        pass

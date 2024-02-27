@@ -3,7 +3,7 @@
 # @author Tim Bohne
 
 from abc import ABC, abstractmethod
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 
 from tensorflow import keras
 
@@ -32,11 +32,11 @@ class ModelAccessor(ABC):
         pass
 
     @abstractmethod
-    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> float:
+    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> List[float, bool]:
         """
         Retrieves a simulated model accuracy to randomly classify signals of the specified component.
 
         :param component: component to retrieve simulated model for
-        :return: simulated model accuracy
+        :return: simulated model accuracy + ground truth anomaly info
         """
         pass

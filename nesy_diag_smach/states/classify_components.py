@@ -4,6 +4,7 @@
 
 import json
 import os
+import random
 from typing import List, Dict, Tuple
 
 import numpy as np
@@ -30,7 +31,7 @@ class ClassifyComponents(smach.State):
     """
 
     def __init__(self, model_accessor: ModelAccessor, data_accessor: DataAccessor, data_provider: DataProvider,
-                 kg_url: str, verbose: bool) -> None:
+                 kg_url: str, verbose: bool, sim_models: bool) -> None:
         """
         Initializes the state.
 
@@ -39,6 +40,7 @@ class ClassifyComponents(smach.State):
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
+        :param sim_models: whether the classification models should be simulated
         """
         smach.State.__init__(self,
                              outcomes=['detected_anomalies', 'no_anomaly', 'no_anomaly_no_more_comp'],
@@ -49,6 +51,7 @@ class ClassifyComponents(smach.State):
         self.data_provider = data_provider
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
+        self.sim_models = sim_models
 
     @staticmethod
     def log_classification_actions(
@@ -144,53 +147,73 @@ class ClassifyComponents(smach.State):
                 print(colored("\n\nclassifying:" + sensor_rec.comp_name, "green", "on_grey", ["bold"]))
             values = sensor_rec.time_series
 
-            model = self.model_accessor.get_keras_univariate_ts_classification_model_by_component(sensor_rec.comp_name)
-            if model is None:
-                util.no_trained_model_available(sensor_rec, suggestion_list)
-                continue
-            (model, model_meta_info) = model  # not only obtain the model here, but also meta info
-            values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
-            try:
-                util.validate_keras_model(model)
-            except ValueError as e:
-                util.invalid_model(sensor_rec, suggestion_list, e)
-                continue
+            if self.sim_models:
+                sim_accuracies = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(
+                    sensor_rec.comp_name
+                )
+                model_acc = float(sim_accuracies[0])
+                ground_truth_anomaly = True if sim_accuracies[1] == "True" else False
+                # throw a dice based on model probability
+                pred_val = random.random()  # random val from [0, 1]
+                # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in model_acc %
+                anomaly = pred_val < model_acc if ground_truth_anomaly else pred_val > model_acc
+                if self.verbose:
+                    if ground_truth_anomaly != anomaly:
+                        print("sim classification..")
+                        print("ground truth anomaly:", ground_truth_anomaly)
+                        print("predicted anomaly:", anomaly, "(", pred_val, ")")
+                        print("model acc.:", model_acc)
+                model_id = "sim_model"
+                heatmap_id = "sim_model_no_heatmap"
+            else:
+                model = self.model_accessor.get_keras_univariate_ts_classification_model_by_component(
+                    sensor_rec.comp_name
+                )
+                if model is None:
+                    util.no_trained_model_available(sensor_rec, suggestion_list)
+                    continue
+                (model, model_meta_info) = model  # not only obtain the model here, but also meta info
+                values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
+                try:
+                    util.validate_keras_model(model)
+                except ValueError as e:
+                    util.invalid_model(sensor_rec, suggestion_list, e)
+                    continue
+                net_input = util.construct_net_input(model, values)
+                prediction = model.predict(np.array([net_input]), verbose=self.verbose)
+                num_classes = len(prediction[0])
+                # addresses both models with one output neuron and those with several
+                anomaly = np.argmax(prediction) == 0 if num_classes > 1 else prediction[0][0] <= 0.5
+                pred_val = prediction.max() if num_classes > 1 else prediction[0][0]
+                heatmaps = util.gen_heatmaps(net_input, model, prediction)
+                res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(pred_val) + "]"
+                self.log_corresponding_error_code(sensor_rec)
+                if self.verbose:
+                    print("heatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
 
-            net_input = util.construct_net_input(model, values)
-            prediction = model.predict(np.array([net_input]), verbose=self.verbose)
-            num_classes = len(prediction[0])
-            # addresses both models with one output neuron and those with several
-            anomaly = np.argmax(prediction) == 0 if num_classes > 1 else prediction[0][0] <= 0.5
-            pred_value = prediction.max() if num_classes > 1 else prediction[0][0]
+                # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
+                heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
+                    "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
+                )
+                # TODO: should be real time values at some point
+                time_values = [i for i in range(len(values))]
+                heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), sensor_rec.comp_name + res_str,
+                                                          time_values)
+                self.data_provider.provide_heatmaps(heatmap_img, sensor_rec.comp_name + res_str)
+                model_id = model_meta_info["model_id"]
 
+            classification_id = self.instance_gen.extend_knowledge_graph_with_signal_classification(
+                anomaly, components_to_be_recorded[sensor_rec.comp_name], sensor_rec.comp_name, pred_val,
+                model_id, sensor_rec_id, heatmap_id
+            )
             if anomaly:
                 if self.verbose:
-                    util.log_anomaly(pred_value)
+                    util.log_anomaly(pred_val)
                 anomalous_components.append(sensor_rec.comp_name)
             else:
                 if self.verbose:
-                    util.log_regular(pred_value)
+                    util.log_regular(pred_val)
                 non_anomalous_components.append(sensor_rec.comp_name)
-
-            heatmaps = util.gen_heatmaps(net_input, model, prediction)
-            res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(pred_value) + "]"
-            self.log_corresponding_error_code(sensor_rec)
-            if self.verbose:
-                print("heatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
-
-            # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
-            heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
-                "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
-            )
-            # TODO: should be real time values at some point
-            time_values = [i for i in range(len(values))]
-            heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), sensor_rec.comp_name + res_str,
-                                                      time_values)
-            self.data_provider.provide_heatmaps(heatmap_img, sensor_rec.comp_name + res_str)
-            classification_id = self.instance_gen.extend_knowledge_graph_with_signal_classification(
-                anomaly, components_to_be_recorded[sensor_rec.comp_name], sensor_rec.comp_name, pred_value,
-                model_meta_info["model_id"], sensor_rec_id, heatmap_id
-            )
             classification_instances[sensor_rec.comp_name] = classification_id
 
     def perform_manual_classifications(

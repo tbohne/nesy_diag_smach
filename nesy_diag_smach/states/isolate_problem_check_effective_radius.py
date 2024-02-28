@@ -5,6 +5,7 @@
 import io
 import json
 import os
+import random
 from collections import defaultdict
 from typing import Union, List, Tuple, Dict
 
@@ -38,7 +39,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     def __init__(
             self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider, kg_url: str,
-            verbose: bool
+            verbose: bool, sim_models: bool
     ) -> None:
         """
         Initializes the state.
@@ -48,6 +49,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
+        :param sim_models: whether the classification models should be simulated
         """
         smach.State.__init__(self,
                              outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
@@ -59,6 +61,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         self.model_accessor = model_accessor
         self.data_provider = data_provider
         self.verbose = verbose
+        self.sim_models = sim_models
 
     @staticmethod
     def create_session_data_dir() -> None:
@@ -122,33 +125,54 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         assert len(sensor_signals) == 1
         values = sensor_signals[0].time_series
         signal_id = self.instance_gen.extend_knowledge_graph_with_time_series(values)
-        model, model_meta_info = self.get_model_and_metadata(affecting_comp)
-        values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
-        net_input = util.construct_net_input(model, values)
-        prediction = model.predict(np.array([net_input]), verbose=self.verbose)
-        num_classes = len(prediction[0])
-        # addresses both models with one output neuron and those with several
-        anomaly = np.argmax(prediction) == 0 if num_classes > 1 else prediction[0][0] <= 0.5
 
-        if self.verbose:
-            if anomaly:
-                util.log_anomaly(prediction[0][0])
-            else:
-                util.log_regular(prediction[0][0])
+        if self.sim_models:
+            sim_accuracies = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(affecting_comp)
+            model_acc = float(sim_accuracies[0])
+            ground_truth_anomaly = True if sim_accuracies[1] == "True" else False
+            # throw a dice based on model probability
+            pred_val = random.random()  # random val from [0, 1]
+            # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in model_acc %
+            anomaly = pred_val < model_acc if ground_truth_anomaly else pred_val > model_acc
 
-        heatmaps = util.gen_heatmaps(net_input, model, prediction)
-        res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(prediction[0][0]) + "]"
-        if self.verbose:
-            print("error code to set heatmap for:", error_code, "\nheatmap excerpt:", heatmaps["tf-keras-gradcam"][:5])
-        # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
-        heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
-            "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
-        )
-        self.provide_heatmaps(affecting_comp, res_str, heatmaps, values)
+            if self.verbose:
+                print("sim classification..")
+                if ground_truth_anomaly != anomaly:
+                    print("ground truth anomaly:", ground_truth_anomaly)
+                    print("predicted anomaly:", anomaly, "(", pred_val, ")")
+                    print("model acc.:", model_acc)
+            model_id = "sim_model"
+            heatmap_id = "sim_model_no_heatmap"
+        else:
+            model, model_meta_info = self.get_model_and_metadata(affecting_comp)
+            values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
+            net_input = util.construct_net_input(model, values)
+            prediction = model.predict(np.array([net_input]), verbose=self.verbose)
+            num_classes = len(prediction[0])
+            pred_val = prediction[0][0]
+            # addresses both models with one output neuron and those with several
+            anomaly = np.argmax(prediction) == 0 if num_classes > 1 else pred_val <= 0.5
+            heatmaps = util.gen_heatmaps(net_input, model, prediction)
+            res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(pred_val) + "]"
+            if self.verbose:
+                print("error code to set heatmap for:", error_code, "\nheatmap excerpt:",
+                      heatmaps["tf-keras-gradcam"][:5])
+            # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
+            heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
+                "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
+            )
+            self.provide_heatmaps(affecting_comp, res_str, heatmaps, values)
+            model_id = model_meta_info['model_id']
+
         classification_id = self.instance_gen.extend_knowledge_graph_with_signal_classification(
-            anomaly, classification_reason, affecting_comp, prediction[0][0], model_meta_info['model_id'],
+            anomaly, classification_reason, affecting_comp, pred_val, model_id,
             signal_id, heatmap_id
         )
+        if self.verbose:
+            if anomaly:
+                util.log_anomaly(pred_val)
+            else:
+                util.log_regular(pred_val)
         return anomaly, classification_id
 
     def construct_complete_graph(

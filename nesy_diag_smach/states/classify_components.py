@@ -14,7 +14,8 @@ from oscillogram_classification import cam
 from termcolor import colored
 
 from nesy_diag_smach import util
-from nesy_diag_smach.config import SESSION_DIR, SUGGESTION_SESSION_FILE, CLASSIFICATION_LOG_FILE
+from nesy_diag_smach.config import SESSION_DIR, SUGGESTION_SESSION_FILE, CLASSIFICATION_LOG_FILE, \
+    SIM_CLASSIFICATION_LOG_FILE
 from nesy_diag_smach.data_types.sensor_data import SensorData
 from nesy_diag_smach.data_types.state_transition import StateTransition
 from nesy_diag_smach.interfaces.data_accessor import DataAccessor
@@ -78,6 +79,36 @@ class ClassifyComponents(smach.State):
         with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "w") as f:
             json.dump(log_file, f, indent=4)
 
+    @staticmethod
+    def log_sim_classifications(
+            classified_components: Dict[str, bool], manually_inspected_components: List[str],
+            classification_instances: Dict[str, str], sim_model_data: Dict[str, Tuple[bool, bool, float, float]]
+    ) -> None:
+        """
+        Logs the simulated classification actions to the session directory.
+
+        :param classified_components: dictionary of classified components + classification results
+        :param manually_inspected_components: components that were classified manually by the human
+        :param classification_instances: IDs of the classification instances by component name
+        :param sim_model_data: dictionary mapping comp name to tuple of ground truth anomaly, anomaly, pred, model acc
+        """
+        with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "r") as f:
+            log_file = json.load(f)
+            for k, v in classified_components.items():
+                new_data = {
+                    k: v,
+                    "Model Accuracy": sim_model_data[k][3],
+                    "Predicted Value": sim_model_data[k][2],
+                    "Ground Truth Anomaly": sim_model_data[k][0],
+                    "State": "CLASSIFY_COMPONENTS",
+                    "Classification Type": "manual inspection"
+                    if k in manually_inspected_components else "signal classification",
+                    "Classification ID": classification_instances[k]
+                }
+                log_file.extend([new_data])
+        with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "w") as f:
+            json.dump(log_file, f, indent=4)
+
     def log_state_info(self) -> None:
         """
         Logs the state information.
@@ -129,7 +160,8 @@ class ClassifyComponents(smach.State):
     def process_sensor_recordings(
             self, sensor_recordings: List[SensorData], suggestion_list: Dict[str, Tuple[str, bool]],
             anomalous_components: List[str], non_anomalous_components: List[str],
-            components_to_be_recorded: Dict[str, str], classification_instances: Dict[str, str]
+            components_to_be_recorded: Dict[str, str], classification_instances: Dict[str, str],
+            sim_model_data: Dict[str, Tuple[bool, bool, float, float]]
     ) -> None:
         """
         Iteratively processes the sensor recordings, i.e., classifies each recording and overlays heatmaps.
@@ -140,6 +172,7 @@ class ClassifyComponents(smach.State):
         :param non_anomalous_components: list to be filled with regular components, i.e., no anomalies
         :param components_to_be_recorded: tuple of recorded components
         :param classification_instances: generated classification instances
+        :param sim_model_data: dictionary mapping comp name to tuple of ground truth anomaly, anomaly, pred, model acc
         """
         for sensor_rec in sensor_recordings:  # iteratively process parallel recorded sensor signals
             sensor_rec_id = self.instance_gen.extend_knowledge_graph_with_time_series(sensor_rec.time_series)
@@ -165,6 +198,7 @@ class ClassifyComponents(smach.State):
                         print("model acc.:", model_acc)
                 model_id = "sim_model"
                 heatmap_id = "sim_model_no_heatmap"
+                sim_model_data[sensor_rec.comp_name] = (ground_truth_anomaly, anomaly, pred_val, model_acc)
             else:
                 model = self.model_accessor.get_keras_univariate_ts_classification_model_by_component(
                     sensor_rec.comp_name
@@ -308,6 +342,7 @@ class ClassifyComponents(smach.State):
         non_anomalous_components = []
         classification_instances = {}
         prev_recorded = []
+        sim_model_data = {}
 
         already_classified_components = self.consider_prev_recorded_components(
             components_to_be_recorded, prev_recorded, anomalous_components, non_anomalous_components
@@ -316,7 +351,7 @@ class ClassifyComponents(smach.State):
 
         self.process_sensor_recordings(
             sensor_signals, userdata.suggestion_list, anomalous_components, non_anomalous_components,
-            components_to_be_recorded, classification_instances
+            components_to_be_recorded, classification_instances, sim_model_data
         )
         self.perform_manual_classifications(
             components_to_be_manually_verified, classification_instances, anomalous_components, non_anomalous_components
@@ -331,6 +366,10 @@ class ClassifyComponents(smach.State):
 
         self.log_classification_actions(
             classified_components, list(components_to_be_manually_verified.keys()), classification_instances
+        )
+        self.log_sim_classifications(
+            classified_components, list(components_to_be_manually_verified.keys()), classification_instances,
+            sim_model_data
         )
         # there are three options:
         #   1. there's only one recording at a time and thus only one classification

@@ -32,7 +32,7 @@ class ModelAccessor(ABC):
         pass
 
     @abstractmethod
-    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> List[float, bool]:
+    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> List[str]:
         """
         Retrieves a simulated model accuracy to randomly classify signals of the specified component.
 

@@ -32,7 +32,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
 
     def __init__(
             self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider,
-            kg_url: str = KG_URL, verbose: bool = True
+            kg_url: str = KG_URL, verbose: bool = True, sim_models: bool = False
     ) -> None:
         """
         Initializes the neuro-symbolic diagnosis state machine.
@@ -42,6 +42,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
         :param data_provider: implementation of the data provider interface
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
+        :param sim_models: whether the classification models should be simulated
         """
         super(NeuroSymbolicDiagnosisStateMachine, self).__init__(
             outcomes=['diag', 'refuted_hypothesis'],
@@ -54,6 +55,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
         self.userdata.sm_input = []
         self.kg_url = kg_url
         self.verbose = verbose
+        self.sim_models = sim_models
 
         with self:
             self.add('READ_FAULT_CONTEXT_AND_GEN_ONTOLOGY_INSTANCES',
@@ -70,7 +72,8 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
 
             self.add('ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS',
                      IsolateProblemCheckEffectiveRadius(
-                         self.data_accessor, self.model_accessor, self.data_provider, self.kg_url, self.verbose
+                         self.data_accessor, self.model_accessor, self.data_provider, self.kg_url, self.verbose,
+                         self.sim_models
                      ),
                      transitions={'isolated_problem': 'PROVIDE_DIAG_AND_SHOW_TRACE',
                                   'isolated_problem_remaining_error_codes': 'SELECT_UNUSED_ERROR_CODE'},
@@ -94,7 +97,8 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
 
             self.add('CLASSIFY_COMPONENTS',
                      ClassifyComponents(
-                         self.model_accessor, self.data_accessor, self.data_provider, self.kg_url, self.verbose
+                         self.model_accessor, self.data_accessor, self.data_provider, self.kg_url, self.verbose,
+                         self.sim_models
                      ),
                      transitions={'no_anomaly_no_more_comp': 'SELECT_UNUSED_ERROR_CODE',
                                   'no_anomaly': 'SUGGEST_SUSPECT_COMPONENTS',

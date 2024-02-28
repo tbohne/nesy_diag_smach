@@ -32,7 +32,7 @@ class ClassifyComponents(smach.State):
     """
 
     def __init__(self, model_accessor: ModelAccessor, data_accessor: DataAccessor, data_provider: DataProvider,
-                 kg_url: str, verbose: bool, sim_models: bool) -> None:
+                 kg_url: str, verbose: bool, sim_models: bool, seed: int) -> None:
         """
         Initializes the state.
 
@@ -42,6 +42,7 @@ class ClassifyComponents(smach.State):
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
         :param sim_models: whether the classification models should be simulated
+        :param seed: seed for random processes
         """
         smach.State.__init__(self,
                              outcomes=['detected_anomalies', 'no_anomaly', 'no_anomaly_no_more_comp'],
@@ -53,6 +54,7 @@ class ClassifyComponents(smach.State):
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
         self.sim_models = sim_models
+        random.seed(seed)
 
     @staticmethod
     def log_classification_actions(

@@ -39,7 +39,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     def __init__(
             self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider, kg_url: str,
-            verbose: bool, sim_models: bool
+            verbose: bool, sim_models: bool, seed: int
     ) -> None:
         """
         Initializes the state.
@@ -50,6 +50,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
         :param sim_models: whether the classification models should be simulated
+        :param seed: seed for random processes
         """
         smach.State.__init__(self,
                              outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
@@ -62,6 +63,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         self.data_provider = data_provider
         self.verbose = verbose
         self.sim_models = sim_models
+        random.seed(seed)
 
     @staticmethod
     def create_session_data_dir() -> None:

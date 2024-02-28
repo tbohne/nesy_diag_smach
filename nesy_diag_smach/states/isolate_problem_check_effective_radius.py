@@ -24,7 +24,7 @@ from termcolor import colored
 
 from nesy_diag_smach import util
 from nesy_diag_smach.config import SESSION_DIR, SUGGESTION_SESSION_FILE, SIGNAL_SESSION_FILES, \
-    CLASSIFICATION_LOG_FILE, FAULT_PATH_TMP_FILE
+    CLASSIFICATION_LOG_FILE, FAULT_PATH_TMP_FILE, SIM_CLASSIFICATION_LOG_FILE
 from nesy_diag_smach.data_types.state_transition import StateTransition
 from nesy_diag_smach.interfaces.data_accessor import DataAccessor
 from nesy_diag_smach.interfaces.data_provider import DataProvider
@@ -109,7 +109,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         self.data_provider.provide_heatmaps(heatmap_img, title)
 
     def classify_component(
-            self, affecting_comp: str, error_code: str, classification_reason: str
+            self, affecting_comp: str, error_code: str, classification_reason: str,
+            sim_model_data: Dict[str, Tuple[bool, bool, float, float]]
     ) -> Union[Tuple[bool, str], None]:
         """
         Classifies the sensor signal for the specified component.
@@ -117,6 +118,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param affecting_comp: component to classify sensor signal for
         :param error_code: error code the original component suggestion was based on
         :param classification_reason: reason for the classification (ID of another classification)
+        :param sim_model_data: dictionary mapping comp name to tuple of ground truth anomaly, anomaly, pred, model acc
         :return: tuple of whether an anomaly has been detected and the corresponding classification ID
         """
         self.create_session_data_dir()
@@ -143,6 +145,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                     print("model acc.:", model_acc)
             model_id = "sim_model"
             heatmap_id = "sim_model_no_heatmap"
+            sim_model_data[affecting_comp] = (ground_truth_anomaly, anomaly, pred_val, model_acc)
         else:
             model, model_meta_info = self.get_model_and_metadata(affecting_comp)
             values = util.preprocess_time_series_based_on_model_meta_info(model_meta_info, values, verbose=False)
@@ -323,6 +326,34 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "w") as f:
             json.dump(log_file, f, indent=4)
 
+    @staticmethod
+    def log_sim_classification_action(
+            comp: str, anomaly: bool, use_sensor_rec: bool, classification_id: str,
+            sim_model_data: Dict[str, Tuple[bool, bool, float, float]]
+    ) -> None:
+        """
+        Logs the simulated classification actions to the session directory.
+
+        :param comp: classified component
+        :param anomaly: whether an anomaly was identified
+        :param use_sensor_rec: whether a sensor recording was used for the classification
+        :param classification_id: ID of the corresponding classification instance
+        :param sim_model_data: dictionary mapping comp name to tuple of ground truth anomaly, anomaly, pred, model acc
+        """
+        with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "r") as f:
+            log_file = json.load(f)
+            log_file.extend([{
+                comp: anomaly,
+                "Model Accuracy": sim_model_data[comp][3],
+                "Predicted Value": sim_model_data[comp][2],
+                "Ground Truth Anomaly": sim_model_data[comp][0],
+                "State": "ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS",
+                "Classification Type": "manual inspection" if not use_sensor_rec else "signal classification",
+                "Classification ID": classification_id
+            }])
+        with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "w") as f:
+            json.dump(log_file, f, indent=4)
+
     def log_state_info(self) -> None:
         """
         Logs the state information.
@@ -459,11 +490,12 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 continue
             # TODO: for now, we expect that all components can be diagnosed based on a sensor signal
             use_sensor_signal = True  # self.qt.query_sensor_signal_usage_by_suspect_component(comp_to_be_checked)[0]
+            sim_model_data = {}
             if use_sensor_signal:
                 if self.verbose:
                     print("use sensor signal..")
                 classification_res = self.classify_component(
-                    comp_to_be_checked, error_code, classified_components[anomalous_comp][1]
+                    comp_to_be_checked, error_code, classified_components[anomalous_comp][1], sim_model_data
                 )
                 if classification_res is None:
                     anomaly = self.data_accessor.get_manual_judgement_for_component(comp_to_be_checked)
@@ -485,6 +517,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                     prev_classified_components
                 )
             self.log_classification_action(comp_to_be_checked, bool(anomaly), use_sensor_signal, classification_id)
+            self.log_sim_classification_action(
+                comp_to_be_checked, bool(anomaly), use_sensor_signal, classification_id, sim_model_data
+            )
 
     @staticmethod
     def create_tmp_file_for_already_found_fault_paths(fault_paths: Dict[str, List[List[str]]]) -> None:

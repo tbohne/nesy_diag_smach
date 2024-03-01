@@ -24,7 +24,7 @@ from termcolor import colored
 
 from nesy_diag_smach import util
 from nesy_diag_smach.config import SESSION_DIR, SUGGESTION_SESSION_FILE, SIGNAL_SESSION_FILES, \
-    CLASSIFICATION_LOG_FILE, FAULT_PATH_TMP_FILE, SIM_CLASSIFICATION_LOG_FILE
+    CLASSIFICATION_LOG_FILE, FAULT_PATH_TMP_FILE, SIM_CLASSIFICATION_LOG_FILE, ANOMALY_GRAPH_TMP_FILE
 from nesy_diag_smach.data_types.state_transition import StateTransition
 from nesy_diag_smach.interfaces.data_accessor import DataAccessor
 from nesy_diag_smach.interfaces.data_provider import DataProvider
@@ -546,6 +546,25 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             json.dump(existing_data, f, default=str)
 
     @staticmethod
+    def save_already_found_anomaly_graph(anomaly_graph_key_str: str, res: List[List[str]]) -> None:
+        if os.path.exists(SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE):
+            with open(SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE, "r") as f:
+                existing_data = json.load(f)
+                existing_data[anomaly_graph_key_str] = res
+        else:
+            existing_data = {anomaly_graph_key_str: res}
+        with open(SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE, "w") as f:
+            json.dump(existing_data, f, default=str)
+
+    @staticmethod
+    def load_already_found_anomaly_graph_res() -> Dict[str, List[List[str]]]:
+        path = SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE
+        if os.path.exists(path):
+            with open(path) as f:
+                return json.load(f)
+        return {}
+
+    @staticmethod
     def load_already_found_fault_paths() -> Dict[str, List[List[str]]]:
         """
         Loads the already found fault paths from the tmp file.
@@ -609,10 +628,16 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         return paths
 
     def find_all_longest_paths(self, anomaly_graph):
+        anomaly_graph_dict = self.load_already_found_anomaly_graph_res()
+        anomaly_graph_key_str = ",".join(list(anomaly_graph.keys()))
+        if anomaly_graph_key_str in anomaly_graph_dict.keys():
+            return anomaly_graph_dict[anomaly_graph_key_str]
         all_paths = []
         for path_src in anomaly_graph:
             all_paths.extend(self.find_paths_dfs(anomaly_graph, path_src))
-        return self.find_unique_longest_paths(all_paths)
+        unique_paths = self.find_unique_longest_paths(all_paths)
+        self.save_already_found_anomaly_graph(anomaly_graph_key_str, unique_paths)
+        return unique_paths
 
     @staticmethod
     def find_unique_longest_paths(paths):
@@ -658,10 +683,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         if self.verbose:
             print(colored("constructing causal graph, i.e., subgraph of structural component knowledge..\n",
                           "green", "on_grey", ["bold"]))
-        complete_graphs = {comp: self.construct_complete_graph({}, [comp])
-                           for comp in classified_components.keys() if classified_components[comp][0]}
+        # complete_graphs = {comp: self.construct_complete_graph({}, [comp])
+        #                   for comp in classified_components.keys() if classified_components[comp][0]}
         explicitly_considered_links = {}
-        self.visualize_initial_graph(anomalous_paths, complete_graphs, explicitly_considered_links)
+        # self.visualize_initial_graph(anomalous_paths, complete_graphs, explicitly_considered_links)
 
         # load potential previous paths from session files
         already_found_fault_paths = self.load_already_found_fault_paths()
@@ -721,11 +746,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                         fault_paths.append([k])
 
             anomalous_paths[anomalous_comp] = fault_paths
-        visualizations = self.gen_causal_graph_visualizations(
-            anomalous_paths, complete_graphs, explicitly_considered_links
-        )
-
-        self.data_provider.provide_causal_graph_visualizations(visualizations)
+        # visualizations = self.gen_causal_graph_visualizations(
+        #     anomalous_paths, complete_graphs, explicitly_considered_links
+        # )
+        # self.data_provider.provide_causal_graph_visualizations(visualizations)
         remaining_error_code_instances = util.load_error_code_instances()
         if self.verbose:
             print("REMAINING error codes:", remaining_error_code_instances)

@@ -630,12 +630,14 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
     def find_all_longest_paths(self, anomaly_graph):
         anomaly_graph_dict = self.load_already_found_anomaly_graph_res()
         anomaly_graph_key_str = ",".join(list(anomaly_graph.keys()))
+        # avoid redundant computations
         if anomaly_graph_key_str in anomaly_graph_dict.keys():
             return anomaly_graph_dict[anomaly_graph_key_str]
         all_paths = []
         for path_src in anomaly_graph:
             all_paths.extend(self.find_paths_dfs(anomaly_graph, path_src))
         unique_paths = self.find_unique_longest_paths(all_paths)
+        # save computed paths for anomaly graph, can be reused later
         self.save_already_found_anomaly_graph(anomaly_graph_key_str, unique_paths)
         return unique_paths
 

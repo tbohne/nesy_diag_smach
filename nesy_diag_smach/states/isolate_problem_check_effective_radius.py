@@ -735,16 +735,20 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 anomaly_graph[start].append(end)
 
             fault_paths = self.find_all_longest_paths(anomaly_graph)
+            edge_comp = "-" + "-".join(["-".join(edge.split(" -> ")) for edge in edges]) + "-"
 
             # handle one-component-paths
             all_previous_paths = list(already_found_fault_paths.values())
+
             if len(all_previous_paths) > 0:
-                all_previous_paths = all_previous_paths[0][0]
+                # all paths in one list instead of one list per key
+                all_previous_paths = [path for paths_by_comp in all_previous_paths for path in paths_by_comp]
+
             for k in explicitly_considered_links.keys():
                 if ((k in classified_components and classified_components[k][0]
                      or k in prev_classified_components and prev_classified_components[k][0])
-                        and k not in " ".join(edges)):  # unconsidered anomaly
-                    if not any(k in i for i in all_previous_paths):  # also not part of previous paths
+                        and "-" + k + "-" not in edge_comp):  # unconsidered anomaly
+                    if not any(k in fp for fp in all_previous_paths):  # also not part of previous paths
                         fault_paths.append([k])
 
             anomalous_paths[anomalous_comp] = fault_paths

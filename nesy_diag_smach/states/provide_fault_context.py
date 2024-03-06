@@ -4,6 +4,7 @@
 
 import json
 import os
+from datetime import datetime
 from typing import Dict, Union, List
 
 import smach
@@ -29,7 +30,7 @@ class ProvideFaultContext(smach.State):
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
         """
-        smach.State.__init__(self, outcomes=['no_diag'], input_keys=[''], output_keys=[''])
+        smach.State.__init__(self, outcomes=['no_diag'], input_keys=[''], output_keys=['final_output'])
         self.data_provider = data_provider
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url, verbose=verbose)
@@ -83,7 +84,7 @@ class ProvideFaultContext(smach.State):
         :param fault_context: fault context data to query diag subject ID for
         :return: diag subject ID
         """
-        return self.qt.query_diag_subject_instance_by_id(fault_context["id"])[0].split("#")[1]
+        return self.qt.query_diag_subject_instance_by_id(fault_context["diag_subject_id"])[0].split("#")[1]
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
@@ -97,7 +98,9 @@ class ProvideFaultContext(smach.State):
         self.data_provider.provide_state_transition(StateTransition(
             "PROVIDE_FAULT_CONTEXT", "refuted_hypothesis", "no_diag"
         ))
-        data = self.read_metadata()
+        # TODO: use metadata in reasonable fashion
+        # data = self.read_metadata()
+        data = {"diag_date": str(datetime.date)}
         fault_context = self.read_fault_context()
         classification_ids = self.read_classification_ids()
         diag_subject_id = self.read_diag_subject_id(fault_context)
@@ -105,4 +108,6 @@ class ProvideFaultContext(smach.State):
         self.instance_gen.extend_knowledge_graph_with_diag_log(
             data["diag_date"], fault_context["error_code_list"], [], classification_ids, diag_subject_id
         )
+
+        userdata.final_output = []
         return "no_diag"

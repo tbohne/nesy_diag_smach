@@ -90,7 +90,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
             self.add('PROVIDE_FAULT_CONTEXT',
                      ProvideFaultContext(self.data_provider, self.kg_url, self.verbose),
                      transitions={'no_diag': 'refuted_hypothesis'},
-                     remapping={})
+                     remapping={'final_output': 'final_output'})
 
             self.add('PROVIDE_DIAG_AND_SHOW_TRACE',
                      ProvideDiagAndShowTrace(self.data_provider, self.kg_url, self.verbose),

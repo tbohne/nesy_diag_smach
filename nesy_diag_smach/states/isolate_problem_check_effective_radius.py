@@ -616,15 +616,17 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 print(final_dict[comp])
         return final_dict
 
-    def find_paths_dfs(self, anomaly_graph, node, path=[]):
-        if node in path:  # deal with cyclic relations
+    def find_paths_dfs(self, anomaly_graph, node, path_extension_attempts, path=[]):
+        if (node in path or node in path_extension_attempts
+                and path in path_extension_attempts[node]):  # deal with cyclic relations
             return [path]
+        path_extension_attempts[node].append(path)
         path = path + [node]  # not using append() because it wouldn't create a new list
         if node not in anomaly_graph:
             return [path]
         paths = []
         for node in anomaly_graph[node]:
-            paths.extend(self.find_paths_dfs(anomaly_graph, node, path))
+            paths.extend(self.find_paths_dfs(anomaly_graph, node, path_extension_attempts, path))
         return paths
 
     def find_all_longest_paths(self, anomaly_graph):
@@ -634,8 +636,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         if anomaly_graph_key_str in anomaly_graph_dict.keys():
             return anomaly_graph_dict[anomaly_graph_key_str]
         all_paths = []
+        path_extension_attempts = defaultdict(list)
         for path_src in anomaly_graph:
-            all_paths.extend(self.find_paths_dfs(anomaly_graph, path_src))
+            all_paths.extend(self.find_paths_dfs(anomaly_graph, path_src, path_extension_attempts))
         unique_paths = self.find_unique_longest_paths(all_paths)
         # save computed paths for anomaly graph, can be reused later
         self.save_already_found_anomaly_graph(anomaly_graph_key_str, unique_paths)

@@ -32,11 +32,11 @@ class ModelAccessor(ABC):
         pass
 
     @abstractmethod
-    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> List[str]:
+    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> Tuple[List[str], int]:
         """
         Retrieves a simulated model accuracy to randomly classify signals of the specified component.
 
         :param component: component to retrieve simulated model for
-        :return: simulated model accuracy + ground truth anomaly info
+        :return: simulated model accuracy + ground truth anomaly info + total number of models available
         """
         pass

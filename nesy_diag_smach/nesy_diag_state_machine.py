@@ -3,6 +3,7 @@
 # @author Tim Bohne
 
 import logging
+import random
 
 import smach
 import tensorflow as tf
@@ -57,7 +58,14 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
         self.kg_url = kg_url
         self.verbose = verbose
         self.sim_models = sim_models
-        self.seed = seed
+
+        random.seed(seed)
+        _, num_of_sim_models = self.model_accessor.get_sim_univariate_ts_classification_model_by_component("C0")
+        comp_indices = [i for i in range(num_of_sim_models)]
+        self.random_value_dict = {
+            # throw a dice based on model probability - random val from [0, 1]
+            "C" + str(i): random.random() for i in comp_indices
+        }
 
         with self:
             self.add('READ_FAULT_CONTEXT_AND_GEN_ONTOLOGY_INSTANCES',
@@ -75,7 +83,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
             self.add('ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS',
                      IsolateProblemCheckEffectiveRadius(
                          self.data_accessor, self.model_accessor, self.data_provider, self.kg_url, self.verbose,
-                         self.sim_models, self.seed
+                         self.sim_models, self.random_value_dict
                      ),
                      transitions={'isolated_problem': 'PROVIDE_DIAG_AND_SHOW_TRACE',
                                   'isolated_problem_remaining_error_codes': 'SELECT_UNUSED_ERROR_CODE'},
@@ -100,7 +108,7 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
             self.add('CLASSIFY_COMPONENTS',
                      ClassifyComponents(
                          self.model_accessor, self.data_accessor, self.data_provider, self.kg_url, self.verbose,
-                         self.sim_models, self.seed
+                         self.sim_models, self.random_value_dict
                      ),
                      transitions={'no_anomaly_no_more_comp': 'SELECT_UNUSED_ERROR_CODE',
                                   'no_anomaly': 'SUGGEST_SUSPECT_COMPONENTS',

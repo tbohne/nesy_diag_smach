@@ -4,7 +4,6 @@
 
 import json
 import os
-import random
 from typing import List, Dict, Tuple
 
 import numpy as np
@@ -32,7 +31,7 @@ class ClassifyComponents(smach.State):
     """
 
     def __init__(self, model_accessor: ModelAccessor, data_accessor: DataAccessor, data_provider: DataProvider,
-                 kg_url: str, verbose: bool, sim_models: bool, seed: int) -> None:
+                 kg_url: str, verbose: bool, sim_models: bool, random_value_dict: Dict[str, float]) -> None:
         """
         Initializes the state.
 
@@ -42,7 +41,7 @@ class ClassifyComponents(smach.State):
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
         :param sim_models: whether the classification models should be simulated
-        :param seed: seed for random processes
+        :param random_value_dict: dictionary containing random values from [0, 1] used for simulated classifications
         """
         smach.State.__init__(self,
                              outcomes=['detected_anomalies', 'no_anomaly', 'no_anomaly_no_more_comp'],
@@ -54,7 +53,7 @@ class ClassifyComponents(smach.State):
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
         self.sim_models = sim_models
-        random.seed(seed)
+        self.random_value_dict = random_value_dict
 
     @staticmethod
     def log_classification_actions(
@@ -183,13 +182,13 @@ class ClassifyComponents(smach.State):
             values = sensor_rec.time_series
 
             if self.sim_models:
-                sim_accuracies = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(
+                sim_accuracies, _ = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(
                     sensor_rec.comp_name
                 )
                 model_acc = float(sim_accuracies[0])
                 ground_truth_anomaly = True if sim_accuracies[1] == "True" else False
-                # throw a dice based on model probability
-                pred_val = random.random()  # random val from [0, 1]
+                # throw a dice based on model probability - random val from [0, 1]
+                pred_val = self.random_value_dict[sensor_rec.comp_name]
                 # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in model_acc %
                 anomaly = pred_val < model_acc if ground_truth_anomaly else pred_val > model_acc
                 if self.verbose:

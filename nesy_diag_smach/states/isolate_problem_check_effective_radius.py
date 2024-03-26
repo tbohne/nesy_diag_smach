@@ -5,7 +5,6 @@
 import io
 import json
 import os
-import random
 from collections import defaultdict
 from typing import Union, List, Tuple, Dict
 
@@ -39,7 +38,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     def __init__(
             self, data_accessor: DataAccessor, model_accessor: ModelAccessor, data_provider: DataProvider, kg_url: str,
-            verbose: bool, sim_models: bool, seed: int
+            verbose: bool, sim_models: bool, random_value_dict: Dict[str, float]
     ) -> None:
         """
         Initializes the state.
@@ -50,7 +49,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
         :param sim_models: whether the classification models should be simulated
-        :param seed: seed for random processes
+        :param random_value_dict: dictionary containing random values from [0, 1] used for simulated classifications
         """
         smach.State.__init__(self,
                              outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
@@ -63,7 +62,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         self.data_provider = data_provider
         self.verbose = verbose
         self.sim_models = sim_models
-        random.seed(seed)
+        self.random_value_dict = random_value_dict
 
     @staticmethod
     def create_session_data_dir() -> None:
@@ -131,11 +130,13 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         signal_id = self.instance_gen.extend_knowledge_graph_with_time_series(values)
 
         if self.sim_models:
-            sim_accuracies = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(affecting_comp)
+            sim_accuracies, _ = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(
+                affecting_comp
+            )
             model_acc = float(sim_accuracies[0])
             ground_truth_anomaly = True if sim_accuracies[1] == "True" else False
-            # throw a dice based on model probability
-            pred_val = random.random()  # random val from [0, 1]
+            # throw a dice based on model probability - random val from [0, 1]
+            pred_val = self.random_value_dict[affecting_comp]
             # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in model_acc %
             anomaly = pred_val < model_acc if ground_truth_anomaly else pred_val > model_acc
 

@@ -23,7 +23,8 @@ from termcolor import colored
 
 from nesy_diag_smach import util
 from nesy_diag_smach.config import SESSION_DIR, SUGGESTION_SESSION_FILE, SIGNAL_SESSION_FILES, \
-    CLASSIFICATION_LOG_FILE, FAULT_PATH_TMP_FILE, SIM_CLASSIFICATION_LOG_FILE, ANOMALY_GRAPH_TMP_FILE
+    CLASSIFICATION_LOG_FILE, FAULT_PATH_TMP_FILE, SIM_CLASSIFICATION_LOG_FILE, ANOMALY_GRAPH_TMP_FILE, \
+    ERROR_CODE_TMP_FILE
 from nesy_diag_smach.data_types.state_transition import StateTransition
 from nesy_diag_smach.interfaces.data_accessor import DataAccessor
 from nesy_diag_smach.interfaces.data_provider import DataProvider
@@ -618,8 +619,11 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         return final_dict
 
     def find_paths_dfs(self, anomaly_graph, node, path_extension_attempts, path=[]):
+        # TODO: is the node even important? or is it sufficient to have considered the subpath for any node?
+        subset = any("-" + "-".join(path) + "-" in "-" + "-".join(p) + "-" for p in path_extension_attempts[node])
+
         if (node in path or node in path_extension_attempts
-                and path in path_extension_attempts[node]):  # deal with cyclic relations
+                and (path in path_extension_attempts[node] or subset)):  # deal with cyclic relations
             return [path]
         path_extension_attempts[node].append(path)
         path = path + [node]  # not using append() because it wouldn't create a new list
@@ -763,6 +767,27 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         remaining_error_code_instances = util.load_error_code_instances()
         if self.verbose:
             print("REMAINING error codes:", remaining_error_code_instances)
+
+        with open(SESSION_DIR + "/" + CLASSIFICATION_LOG_FILE, "r") as f:
+            log_file = json.load(f)
+            already_classified_comps = [list(classification.keys())[0] for classification in log_file]
+
+        reduced_list_of_remaining_codes = []
+        for code in remaining_error_code_instances:
+            sus_comp = self.qt.query_suspect_components_by_error_code(code)
+            # if all of those were already classified in the past, we can discard the corresponding code
+            for comp in sus_comp:
+                if comp not in already_classified_comps:
+                    reduced_list_of_remaining_codes.append(code)
+                    break
+        if self.verbose:
+            print("BEFORE:", len(remaining_error_code_instances))
+            print("AFTER:", len(reduced_list_of_remaining_codes))
+        remaining_error_code_instances = reduced_list_of_remaining_codes
+
+        with open(SESSION_DIR + "/" + ERROR_CODE_TMP_FILE, "w") as f:
+            json.dump({'list': remaining_error_code_instances}, f, default=str)
+
         if len(remaining_error_code_instances) > 0:
             self.create_tmp_file_for_already_found_fault_paths(anomalous_paths)  # write anomalous paths to session file
             self.data_provider.provide_state_transition(StateTransition(

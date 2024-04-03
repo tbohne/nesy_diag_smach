@@ -619,11 +619,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         return final_dict
 
     def find_paths_dfs(self, anomaly_graph, node, path_extension_attempts, path=[]):
-        # TODO: is the node even important? or is it sufficient to have considered the subpath for any node?
-        subset = any("-" + "-".join(path) + "-" in "-" + "-".join(p) + "-" for p in path_extension_attempts[node])
-
-        if (node in path or node in path_extension_attempts
-                and (path in path_extension_attempts[node] or subset)):  # deal with cyclic relations
+        # deal with cyclic relations
+        if node in path or node in path_extension_attempts and path in path_extension_attempts[node]:
             return [path]
         path_extension_attempts[node].append(path)
         path = path + [node]  # not using append() because it wouldn't create a new list

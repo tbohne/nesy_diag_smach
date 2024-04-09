@@ -109,5 +109,5 @@ class ProvideFaultContext(smach.State):
             data["diag_date"], fault_context["error_code_list"], [], classification_ids, diag_subject_id
         )
 
-        userdata.final_output = []
+        userdata.final_output = "no_diag"
         return "no_diag"

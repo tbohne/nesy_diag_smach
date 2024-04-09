@@ -77,8 +77,9 @@ class NeuroSymbolicDiagnosisStateMachine(smach.StateMachine):
 
             self.add('SELECT_UNUSED_ERROR_CODE', SelectUnusedErrorCode(self.data_provider, self.verbose),
                      transitions={'selected_best_instance': 'SUGGEST_SUSPECT_COMPONENTS',
-                                  'no_instance': 'NO_PROBLEM_DETECTED_CHECK_SENSOR'},
-                     remapping={'selected_instance': 'sm_input'})
+                                  'no_instance': 'NO_PROBLEM_DETECTED_CHECK_SENSOR',
+                                  'no_instance_prev_diag': 'PROVIDE_DIAG_AND_SHOW_TRACE'},
+                     remapping={'selected_instance': 'sm_input', 'fault_paths': 'sm_input'})
 
             self.add('ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS',
                      IsolateProblemCheckEffectiveRadius(

@@ -20,7 +20,7 @@ class LocalDataProvider(DataProvider):
     Implementation of the data provider interface.
     """
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False) -> None:
         """
         Initializes the local data provider.
 

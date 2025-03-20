@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @author Tim Bohne
 
-from typing import Union, Tuple
+from typing import Union, Tuple, List, Dict
 
 from tensorflow import keras
 
@@ -15,7 +15,7 @@ class LocalModelAccessor(ModelAccessor):
     Implementation of the model accessor interface using local model files.
     """
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False) -> None:
         """
         Initializes the local model accessor.
 
@@ -25,7 +25,7 @@ class LocalModelAccessor(ModelAccessor):
 
     def get_keras_univariate_ts_classification_model_by_component(
             self, component: str
-    ) -> Union[Tuple[keras.models.Model, dict], None]:
+    ) -> Union[Tuple[keras.models.Model, Dict], None]:
         """
         Retrieves a trained model to classify signals of the specified component.
 
@@ -50,3 +50,13 @@ class LocalModelAccessor(ModelAccessor):
         except OSError as e:
             print("no trained model available for the signal (component) to be classified:", component)
             print("ERROR:", e)
+
+    def get_sim_univariate_ts_classification_model_by_component(self, component: str) -> Tuple[List[str], int]:
+        """
+        Retrieves a simulated model accuracy to randomly classify signals of the specified component.
+
+        :param component: component to retrieve simulated model for
+        :return: [simulated model accuracy, ground truth anomaly info], total number of models available
+        """
+        # random values for testing purposes
+        return ["0.9452419239170088", "False"], 28

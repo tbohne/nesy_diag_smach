@@ -24,14 +24,16 @@ from nesy_diag_smach.interfaces.model_accessor import ModelAccessor
 
 class ClassifyComponents(smach.State):
     """
-    State in the SMACH that represents situations in which the suggested physical components are classified:
+    State in the SMACH that represents situations in which the suggested (physical) components are classified:
         - synchronized sensor recordings are performed at the suggested suspect components
         - recorded signals are classified using the trained neural net models, i.e., detecting anomalies
-        - manual inspection of suspect components, for which signal diagnosis is not appropriate, is performed
+        - manual inspection of suspect components for which signal diagnosis is inappropriate is performed
     """
 
-    def __init__(self, model_accessor: ModelAccessor, data_accessor: DataAccessor, data_provider: DataProvider,
-                 kg_url: str, verbose: bool, sim_models: bool, random_value_dict: Dict[str, float]) -> None:
+    def __init__(
+            self, model_accessor: ModelAccessor, data_accessor: DataAccessor, data_provider: DataProvider, kg_url: str,
+            verbose: bool, sim_models: bool, random_value_dict: Dict[str, float]
+    ) -> None:
         """
         Initializes the state.
 
@@ -43,10 +45,12 @@ class ClassifyComponents(smach.State):
         :param sim_models: whether the classification models should be simulated
         :param random_value_dict: dictionary containing random values from [0, 1] used for simulated classifications
         """
-        smach.State.__init__(self,
-                             outcomes=['detected_anomalies', 'no_anomaly', 'no_anomaly_no_more_comp'],
-                             input_keys=['suggestion_list'],
-                             output_keys=['classified_components'])
+        smach.State.__init__(
+            self,
+            outcomes=['detected_anomalies', 'no_anomaly', 'no_anomaly_no_more_comp'],
+            input_keys=['suggestion_list'],
+            output_keys=['classified_components']
+        )
         self.model_accessor = model_accessor
         self.data_accessor = data_accessor
         self.data_provider = data_provider
@@ -102,8 +106,7 @@ class ClassifyComponents(smach.State):
                     "Predicted Value": sim_model_data[k][2],
                     "Ground Truth Anomaly": sim_model_data[k][0],
                     "State": "CLASSIFY_COMPONENTS",
-                    "Classification Type": "manual inspection"
-                    if k in manually_inspected_components else "signal classification",
+                    "Classification Type": "manual inspection" if k in manually_inspected_components else "signal classification",
                     "Classification ID": classification_instances[k]
                 }
                 log_file.extend([new_data])
@@ -117,8 +120,10 @@ class ClassifyComponents(smach.State):
         if self.verbose:
             os.system('cls' if os.name == 'nt' else 'clear')
             print("\n\n############################################")
-            print("executing", colored("CLASSIFY_COMPONENTS", "yellow", "on_grey", ["bold"]),
-                  "state (applying trained model)..")
+            print(
+                "executing", colored("CLASSIFY_COMPONENTS", "yellow", "on_grey", ["bold"]),
+                "state (applying trained model).."
+            )
             print("############################################")
 
     def perform_synchronized_sensor_recordings(
@@ -127,7 +132,7 @@ class ClassifyComponents(smach.State):
         """
         Performs synchronized sensor recordings based on the provided suggestion list.
 
-        :param suggestion_list: suspect components suggested for analysis {comp_name: (reason_for, osci_usage)}
+        :param suggestion_list: suspect components suggested for analysis {comp_name: (reason_for, sensor_usage)}
         :return: tuple of components to be recorded and components to be verified manually
                  ({comp: reason_for}, {comp: reason_for})
         """
@@ -148,7 +153,7 @@ class ClassifyComponents(smach.State):
         Logs the corresponding error code to set the heatmaps for, i.e., reads the error code suggestion.
         Assumption: it is always the latest suggestion.
 
-        :param sensor_data: sensor data (time series signal)
+        :param sensor_data: sensor data (e.g., time series signal)
         """
         with open(SESSION_DIR + "/" + SUGGESTION_SESSION_FILE) as f:
             suggestions = json.load(f)
@@ -168,15 +173,15 @@ class ClassifyComponents(smach.State):
         Iteratively processes the sensor recordings, i.e., classifies each recording and overlays heatmaps.
 
         :param sensor_recordings: sensor signals to be classified
-        :param suggestion_list: suspect components suggested for analysis {comp_name: (reason_for, osci_usage)}
+        :param suggestion_list: suspect components suggested for analysis {comp_name: (reason_for, sensor_usage)}
         :param anomalous_components: list to be filled with anomalous components, i.e., detected anomalies
         :param non_anomalous_components: list to be filled with regular components, i.e., no anomalies
         :param components_to_be_recorded: tuple of recorded components
         :param classification_instances: generated classification instances
         :param sim_model_data: dictionary mapping comp name to tuple of ground truth anomaly, anomaly, pred, model acc
         """
-        for sensor_rec in sensor_recordings:  # iteratively process parallel recorded sensor signals
-            sensor_rec_id = self.instance_gen.extend_knowledge_graph_with_time_series(sensor_rec.time_series)
+        for sensor_rec in sensor_recordings:  # iteratively process parallelly recorded sensor signals
+            sensor_rec_id = self.instance_gen.extend_knowledge_graph_with_sensor_signal(sensor_rec.time_series)
             if self.verbose:
                 print(colored("\n\nclassifying:" + sensor_rec.comp_name, "green", "on_grey", ["bold"]))
             values = sensor_rec.time_series
@@ -232,8 +237,9 @@ class ClassifyComponents(smach.State):
                 )
                 # TODO: should be real time values at some point
                 time_values = [i for i in range(len(values))]
-                heatmap_img = cam.gen_heatmaps_as_overlay(heatmaps, np.array(values), sensor_rec.comp_name + res_str,
-                                                          time_values)
+                heatmap_img = cam.gen_heatmaps_as_overlay(
+                    heatmaps, np.array(values), sensor_rec.comp_name + res_str, time_values
+                )
                 self.data_provider.provide_heatmaps(heatmap_img, sensor_rec.comp_name + res_str)
                 model_id = model_meta_info["model_id"]
 
@@ -375,8 +381,8 @@ class ClassifyComponents(smach.State):
         # there are three options:
         #   1. there's only one recording at a time and thus only one classification
         #   2. there are as many parallel recordings as there are suspect components for the error code
-        #   3. there are multiple parallel recordings, but not as many as there are suspect components for the error code
-        # TODO: are there remaining suspect components? (atm every component is suggested each case)
+        #   3. there are multiple parallel recordings, but not as many as there are suspect components for the error
+        # TODO: are there remaining suspect components? (atm, every component is suggested each case)
         remaining_suspect_components = False
 
         if len(anomalous_components) == 0 and not remaining_suspect_components:

@@ -3,7 +3,7 @@
 # @author Tim Bohne
 
 from abc import ABC, abstractmethod
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Dict
 
 from tensorflow import keras
 
@@ -16,7 +16,7 @@ class ModelAccessor(ABC):
     @abstractmethod
     def get_keras_univariate_ts_classification_model_by_component(
             self, component: str
-    ) -> Union[Tuple[keras.models.Model, dict], None]:
+    ) -> Union[Tuple[keras.models.Model, Dict], None]:
         """
         Retrieves a trained model to classify signals of the specified component.
 

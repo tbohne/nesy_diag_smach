@@ -7,8 +7,7 @@ from typing import List
 
 from oscillogram_classification import preprocess
 
-from nesy_diag_smach.config import FAULT_CONTEXT_INPUT_FILE
-from nesy_diag_smach.config import SIGNAL_SESSION_FILES
+from nesy_diag_smach.config import FAULT_CONTEXT_INPUT_FILE, SIGNAL_SESSION_FILES
 from nesy_diag_smach.data_types.fault_context import FaultContext
 from nesy_diag_smach.data_types.sensor_data import SensorData
 from nesy_diag_smach.interfaces.data_accessor import DataAccessor
@@ -19,7 +18,7 @@ class LocalDataAccessor(DataAccessor):
     Implementation of the data accessor interface using local files.
     """
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False) -> None:
         """
         Initializes the local data accessor.
 
@@ -43,7 +42,7 @@ class LocalDataAccessor(DataAccessor):
         # only take list of error codes as input, not more
         input_error_codes = list(problem_instance["error_codes"].keys())
 
-        fault_context = FaultContext(input_error_codes, "1234567890ABCDEFGHJKLMNPRSTUVWXYZ")
+        fault_context = FaultContext(input_error_codes, "2342713")
         print(fault_context)
         return fault_context
 
@@ -60,7 +59,7 @@ class LocalDataAccessor(DataAccessor):
                         + " and the signals are generated for " + str(components))
         signals = []
 
-        # for each component we need to check the ground truth of the instance - if it should have an anomaly
+        # for each component, we need to check the ground truth of the instance - if it should have an anomaly
         with open(FAULT_CONTEXT_INPUT_FILE, "r") as f:
             problem_instance = json.load(f)
 

@@ -9,3 +9,4 @@ matplotlib
 pandas
 numpy
 git+https://github.com/tbohne/oscillogram_classification.git@v0.2.0
+git+https://github.com/tbohne/nesy_diag_ontology.git@v0.0.1

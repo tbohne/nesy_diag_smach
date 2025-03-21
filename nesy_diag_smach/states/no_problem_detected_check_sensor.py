@@ -50,7 +50,6 @@ class NoProblemDetectedCheckSensor(smach.State):
         :return: outcome of the state ("sensor_works" | "sensor_defective")
         """
         self.log_state_info()
-        # TODO: we should think about making the sensor explicit -- where to get this info?
         anomaly = self.data_accessor.get_manual_judgement_for_sensor()
         if anomaly:
             self.data_provider.provide_state_transition(StateTransition(

@@ -15,8 +15,7 @@ import pandas as pd
 import smach
 from PIL import Image
 from matplotlib.lines import Line2D
-from nesy_diag_ontology import knowledge_graph_query_tool
-from nesy_diag_ontology import ontology_instance_generator
+from nesy_diag_ontology import knowledge_graph_query_tool, ontology_instance_generator
 from oscillogram_classification import cam
 from tensorflow import keras
 from termcolor import colored
@@ -34,7 +33,7 @@ from nesy_diag_smach.interfaces.model_accessor import ModelAccessor
 class IsolateProblemCheckEffectiveRadius(smach.State):
     """
     State in the SMACH that represents situations in which one or more anomalies have been detected, and the
-    task is to isolate the defective components based on their effective radius (structural knowledge).
+    task is to isolate the anomalous components based on their effective radius (structural knowledge).
     """
 
     def __init__(
@@ -52,10 +51,12 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         :param sim_models: whether the classification models should be simulated
         :param random_value_dict: dictionary containing random values from [0, 1] used for simulated classifications
         """
-        smach.State.__init__(self,
-                             outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
-                             input_keys=['classified_components'],
-                             output_keys=['fault_paths'])
+        smach.State.__init__(
+            self,
+            outcomes=['isolated_problem', 'isolated_problem_remaining_error_codes'],
+            input_keys=['classified_components'],
+            output_keys=['fault_paths']
+        )
         self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url, verbose=verbose)
         self.instance_gen = ontology_instance_generator.OntologyInstanceGenerator(kg_url=kg_url, verbose=verbose)
         self.data_accessor = data_accessor
@@ -74,7 +75,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         if not os.path.exists(signal_iso_session_dir):
             os.makedirs(signal_iso_session_dir)
 
-    def get_model_and_metadata(self, affecting_comp: str) -> Tuple[keras.models.Model, dict]:
+    def get_model_and_metadata(self, affecting_comp: str) -> Tuple[keras.models.Model, Dict]:
         """
         Retrieves the trained model and the corresponding metadata.
 
@@ -138,7 +139,8 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             ground_truth_anomaly = True if sim_accuracies[1] == "True" else False
             # throw a dice based on model probability - random val from [0, 1]
             pred_val = self.random_value_dict[affecting_comp]
-            # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in model_acc %
+            # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in
+            # (1 - model_acc) % of the cases
             anomaly = pred_val < model_acc if ground_truth_anomaly else pred_val > model_acc
 
             if self.verbose:
@@ -162,8 +164,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             heatmaps = util.gen_heatmaps(net_input, model, prediction)
             res_str = (" [ANOMALY" if anomaly else " [NO ANOMALY") + " - SCORE: " + str(pred_val) + "]"
             if self.verbose:
-                print("error code to set heatmap for:", error_code, "\nheatmap excerpt:",
-                      heatmaps["tf-keras-gradcam"][:5])
+                print(
+                    "error code to set heatmap for:", error_code, "\nheatmap excerpt:", heatmaps["tf-keras-gradcam"][:5]
+                )
             # TODO: which heatmap generation method result do we store here? for now, I'll use gradcam
             heatmap_id = self.instance_gen.extend_knowledge_graph_with_heatmap(
                 "tf-keras-gradcam", heatmaps["tf-keras-gradcam"].tolist()
@@ -172,8 +175,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             model_id = model_meta_info['model_id']
 
         classification_id = self.instance_gen.extend_knowledge_graph_with_signal_classification(
-            anomaly, classification_reason, affecting_comp, pred_val, model_id,
-            signal_id, heatmap_id
+            anomaly, classification_reason, affecting_comp, pred_val, model_id, signal_id, heatmap_id
         )
         if self.verbose:
             if anomaly:
@@ -365,8 +367,9 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         if self.verbose:
             os.system('cls' if os.name == 'nt' else 'clear')
             print("\n\n############################################")
-            print("executing", colored("ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "yellow", "on_grey", ["bold"]),
-                  "state..")
+            print(
+                "executing", colored("ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS", "yellow", "on_grey", ["bold"]), "state.."
+            )
             print("############################################\n")
 
     def retrieve_already_checked_components(self, classified_components: List[str]) -> Dict[str, Tuple[bool, str]]:
@@ -464,7 +467,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         """
         Works through the unisolated components, i.e., performs fault isolation.
 
-        :param unisolated_comps: unisolated components to work though
+        :param unisolated_comps: unisolated components to work through
         :param explicitly_considered_links: list of explicitly considered links
         :param classified_components: dict of already checked components (in classification state)
         :param error_code: error code the original component suggestion was based on
@@ -549,6 +552,12 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     @staticmethod
     def save_already_found_anomaly_graph(anomaly_graph_key_str: str, res: List[List[str]]) -> None:
+        """
+        Saves an already found anomaly graph.
+
+        :param anomaly_graph_key_str: key for the anomaly graph
+        :param res: result for the anomaly graph
+        """
         if os.path.exists(SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE):
             with open(SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE, "r") as f:
                 existing_data = json.load(f)
@@ -560,6 +569,11 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
     @staticmethod
     def load_already_found_anomaly_graph_res() -> Dict[str, List[List[str]]]:
+        """
+        Loads an already found anomaly graph result.
+
+        :return: already found anomaly graph result
+        """
         path = SESSION_DIR + "/" + ANOMALY_GRAPH_TMP_FILE
         if os.path.exists(path):
             with open(path) as f:
@@ -591,8 +605,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             for path in paths.keys():
                 print(paths[path])
 
-        # a fault path that is found based on several components is only stored
-        # under the one it was first found with
+        # a fault path that is found based on several components is only stored under the one it was first found with
         already_seen_paths = []
         for comp in paths.keys():
             updated_paths = []
@@ -618,7 +631,19 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 print(final_dict[comp])
         return final_dict
 
-    def find_paths_dfs(self, anomaly_graph, node, path_extension_attempts, path=[]):
+    def find_paths_dfs(
+            self, anomaly_graph: Dict[str, List[str]], node: str, path_extension_attempts: Dict[str, List[List[str]]],
+            path: List[str] = []
+    ) -> List[List[str]]:
+        """
+        Finds the paths using a depth-first search.
+
+        :param anomaly_graph: anomaly graph to find paths in
+        :param node: source of path
+        :param path_extension_attempts: extension attempts for each node
+        :param path: path to be extended
+        :return: found paths
+        """
         # deal with cyclic relations
         if node in path or node in path_extension_attempts and path in path_extension_attempts[node]:
             return [path]
@@ -631,7 +656,13 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             paths.extend(self.find_paths_dfs(anomaly_graph, node, path_extension_attempts, path))
         return paths
 
-    def find_all_longest_paths(self, anomaly_graph):
+    def find_all_longest_paths(self, anomaly_graph: Dict[str, List[str]]) -> List[List[str]]:
+        """
+        Finds all longest paths in the anomaly graph.
+
+        :param anomaly_graph: anomaly graph to find the longest paths in
+        :return: unique longest paths
+        """
         anomaly_graph_dict = self.load_already_found_anomaly_graph_res()
         anomaly_graph_key_str = ",".join(list(anomaly_graph.keys()))
         # avoid redundant computations
@@ -647,7 +678,13 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         return unique_paths
 
     @staticmethod
-    def find_unique_longest_paths(paths):
+    def find_unique_longest_paths(paths: List[List[str]]) -> List[List[str]]:
+        """
+        Finds the unique longest paths.
+
+        :param paths: list of paths to be filtered
+        :return: unique paths
+        """
         unique_paths = []
         paths_sorted = sorted(paths, key=len, reverse=True)
         for path in paths_sorted:
@@ -688,8 +725,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
 
         anomalous_paths = {}
         if self.verbose:
-            print(colored("constructing causal graph, i.e., subgraph of structural component knowledge..\n",
-                          "green", "on_grey", ["bold"]))
+            print(colored(
+                "constructing causal graph, i.e., subgraph of structural component knowledge..\n",
+                "green", "on_grey", ["bold"]
+            ))
         # complete_graphs = {comp: self.construct_complete_graph({}, [comp])
         #                   for comp in classified_components.keys() if classified_components[comp][0]}
         explicitly_considered_links = {}
@@ -725,11 +764,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
             edges = []
             for k in explicitly_considered_links.keys():
                 if (k in classified_components and classified_components[k][0]
-                        or k in prev_classified_components and prev_classified_components[k][0]):  # k has anomaly
+                        or k in prev_classified_components and prev_classified_components[k][0]):  # k anomaly
                     for v in explicitly_considered_links[k]:
                         if (v in classified_components and classified_components[v][0]
-                                or v in prev_classified_components and prev_classified_components[v][
-                                    0]):  # v has anomaly
+                                or v in prev_classified_components and prev_classified_components[v][0]):  # v anomaly
                             edges.append(k + " -> " + v)
 
             edges = edges[::-1]  # has to be reversed, affected-by direction

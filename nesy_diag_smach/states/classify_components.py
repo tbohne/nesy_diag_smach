@@ -194,7 +194,8 @@ class ClassifyComponents(smach.State):
                 ground_truth_anomaly = True if sim_accuracies[1] == "True" else False
                 # throw a dice based on model probability - random val from [0, 1]
                 pred_val = self.random_value_dict[sensor_rec.comp_name]
-                # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in model_acc %
+                # if ground truth anomaly, we find it in model_acc % of the cases, if not, we have an FP in
+                # (1 - model_acc) % of the cases
                 anomaly = pred_val < model_acc if ground_truth_anomaly else pred_val > model_acc
                 if self.verbose:
                     if ground_truth_anomaly != anomaly:

@@ -29,10 +29,12 @@ class SelectUnusedErrorCode(smach.State):
         :param data_provider: implementation of the data provider interface
         :param verbose: whether the state machine should log its state, transitions, etc.
         """
-        smach.State.__init__(self,
-                             outcomes=['selected_best_instance', 'no_instance', 'no_instance_prev_diag'],
-                             input_keys=[''],
-                             output_keys=['selected_instance', 'fault_paths'])
+        smach.State.__init__(
+            self,
+            outcomes=['selected_best_instance', 'no_instance', 'no_instance_prev_diag'],
+            input_keys=[''],
+            output_keys=['selected_instance', 'fault_paths']
+        )
         self.data_provider = data_provider
         self.verbose = verbose
 
@@ -85,7 +87,13 @@ class SelectUnusedErrorCode(smach.State):
         return {}
 
     @staticmethod
-    def find_unique_longest_paths(paths):
+    def find_unique_longest_paths(paths: List[List[str]]) -> List[List[str]]:
+        """
+        Finds the unique longest paths from a list of paths.
+
+        :param paths: paths to find unique longest paths in
+        :return: unique longest paths
+        """
         unique_paths = []
         paths_sorted = sorted(paths, key=len, reverse=True)
         for path in paths_sorted:
@@ -105,8 +113,7 @@ class SelectUnusedErrorCode(smach.State):
             for path in paths.keys():
                 print(paths[path])
 
-        # a fault path that is found based on several components is only stored
-        # under the one it was first found with
+        # a fault path that is found based on several components is only stored under the one it was first found with
         already_seen_paths = []
         for comp in paths.keys():
             updated_paths = []

@@ -18,7 +18,7 @@ from nesy_diag_smach.interfaces.data_provider import DataProvider
 class SuggestSuspectComponents(smach.State):
     """
     State in the SMACH that represents situations in which suspect components (physical components) in the
-    diag subject are suggested to be investigated based on the available information.
+    diag entity are suggested to be investigated based on the available information.
     """
 
     def __init__(self, data_provider: DataProvider, kg_url: str, verbose: bool) -> None:
@@ -29,10 +29,12 @@ class SuggestSuspectComponents(smach.State):
         :param kg_url: URL of the knowledge graph guiding the diagnosis
         :param verbose: whether the state machine should log its state, transitions, etc.
         """
-        smach.State.__init__(self,
-                             outcomes=['provided_suggestions'],
-                             input_keys=['selected_instance'],
-                             output_keys=['suggestion_list'])
+        smach.State.__init__(
+            self,
+            outcomes=['provided_suggestions'],
+            input_keys=['selected_instance'],
+            output_keys=['suggestion_list']
+        )
         self.data_provider = data_provider
         self.qt = knowledge_graph_query_tool.KnowledgeGraphQueryTool(kg_url=kg_url, verbose=verbose)
         self.verbose = verbose
@@ -95,8 +97,9 @@ class SuggestSuspectComponents(smach.State):
             sensor_usage.append(use)
         return sensor_usage
 
-    def gen_suggestions(self, selected_instance: str, suspect_components: List[str], sensor_usage: List[bool]) \
-            -> Dict[str, Tuple[str, bool]]:
+    def gen_suggestions(
+            self, selected_instance: str, suspect_components: List[str], sensor_usage: List[bool]
+    ) -> Dict[str, Tuple[str, bool]]:
         """
         Generates the suggestion dictionary: {comp: (reason_for, anomaly)}.
 

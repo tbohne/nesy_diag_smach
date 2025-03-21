@@ -77,14 +77,14 @@ class ProvideFaultContext(smach.State):
             log_file = json.load(f)
         return [classification_entry["Classification ID"] for classification_entry in log_file]
 
-    def read_diag_subject_id(self, fault_context) -> str:
+    def read_diag_entity_id(self, fault_context: Dict[str, Union[str, List[str]]]) -> str:
         """
-        Queries the ID of the diagnosis subject based on the provided fault context.
+        Queries the ID of the diagnosis entity based on the provided fault context.
 
-        :param fault_context: fault context data to query diag subject ID for
-        :return: diag subject ID
+        :param fault_context: fault context data to query diag entity ID for
+        :return: diag entity ID
         """
-        return self.qt.query_diag_subject_instance_by_id(fault_context["diag_subject_id"])[0].split("#")[1]
+        return self.qt.query_diag_entity_instance_by_id(fault_context["diag_entity_id"])[0].split("#")[1]
 
     def execute(self, userdata: smach.user_data.Remapper) -> str:
         """
@@ -94,7 +94,7 @@ class ProvideFaultContext(smach.State):
         :return: outcome of the state ("no_diag")
         """
         self.log_state_info()
-        # TODO: create log file for the failed diagnostic process to improve future diagnosis (missing knowledge etc.)
+        # TODO: create log file for the failed diagnostic process to improve future diagnosis (missing knowledge, etc.)
         self.data_provider.provide_state_transition(StateTransition(
             "PROVIDE_FAULT_CONTEXT", "refuted_hypothesis", "no_diag"
         ))
@@ -103,11 +103,10 @@ class ProvideFaultContext(smach.State):
         data = {"diag_date": str(datetime.date)}
         fault_context = self.read_fault_context()
         classification_ids = self.read_classification_ids()
-        diag_subject_id = self.read_diag_subject_id(fault_context)
+        diag_entity_id = self.read_diag_entity_id(fault_context)
 
         self.instance_gen.extend_knowledge_graph_with_diag_log(
-            data["diag_date"], fault_context["error_code_list"], [], classification_ids, diag_subject_id
+            data["diag_date"], fault_context["error_code_list"], [], classification_ids, diag_entity_id
         )
-
         userdata.final_output = "no_diag"
         return "no_diag"

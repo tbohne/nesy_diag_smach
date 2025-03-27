@@ -4,5 +4,3 @@ build/
 *.egg-info/
 session_files/
 res/rename.py
-res/dummy_signals
-res/trained_models

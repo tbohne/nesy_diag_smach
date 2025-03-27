@@ -100,16 +100,17 @@ class ClassifyComponents(smach.State):
         with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "r") as f:
             log_file = json.load(f)
             for k, v in classified_components.items():
-                new_data = {
-                    k: v,
-                    "Model Accuracy": sim_model_data[k][3],
-                    "Predicted Value": sim_model_data[k][2],
-                    "Ground Truth Anomaly": sim_model_data[k][0],
-                    "State": "CLASSIFY_COMPONENTS",
-                    "Classification Type": "manual inspection" if k in manually_inspected_components else "signal classification",
-                    "Classification ID": classification_instances[k]
-                }
-                log_file.extend([new_data])
+                if k in sim_model_data:
+                    new_data = {
+                        k: v,
+                        "Model Accuracy": sim_model_data[k][3],
+                        "Predicted Value": sim_model_data[k][2],
+                        "Ground Truth Anomaly": sim_model_data[k][0],
+                        "State": "CLASSIFY_COMPONENTS",
+                        "Classification Type": "manual inspection" if k in manually_inspected_components else "signal classification",
+                        "Classification ID": classification_instances[k]
+                    }
+                    log_file.extend([new_data])
         with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "w") as f:
             json.dump(log_file, f, indent=4)
 

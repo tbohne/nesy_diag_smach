@@ -129,7 +129,7 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         sensor_signals = self.data_accessor.get_signals_by_components([affecting_comp])
         assert len(sensor_signals) == 1
         values = sensor_signals[0].time_series
-        signal_id = self.instance_gen.extend_knowledge_graph_with_time_series(values)
+        signal_id = self.instance_gen.extend_knowledge_graph_with_sensor_signal(values)
 
         if self.sim_models:
             sim_accuracies, _ = self.model_accessor.get_sim_univariate_ts_classification_model_by_component(
@@ -348,15 +348,16 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
         """
         with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "r") as f:
             log_file = json.load(f)
-            log_file.extend([{
-                comp: anomaly,
-                "Model Accuracy": sim_model_data[comp][3],
-                "Predicted Value": sim_model_data[comp][2],
-                "Ground Truth Anomaly": sim_model_data[comp][0],
-                "State": "ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS",
-                "Classification Type": "manual inspection" if not use_sensor_rec else "signal classification",
-                "Classification ID": classification_id
-            }])
+            if comp in sim_model_data:
+                log_file.extend([{
+                    comp: anomaly,
+                    "Model Accuracy": sim_model_data[comp][3],
+                    "Predicted Value": sim_model_data[comp][2],
+                    "Ground Truth Anomaly": sim_model_data[comp][0],
+                    "State": "ISOLATE_PROBLEM_CHECK_EFFECTIVE_RADIUS",
+                    "Classification Type": "manual inspection" if not use_sensor_rec else "signal classification",
+                    "Classification ID": classification_id
+                }])
         with open(SESSION_DIR + "/" + SIM_CLASSIFICATION_LOG_FILE, "w") as f:
             json.dump(log_file, f, indent=4)
 

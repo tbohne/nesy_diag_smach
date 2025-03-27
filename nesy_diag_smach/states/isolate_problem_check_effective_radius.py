@@ -730,10 +730,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                 "constructing causal graph, i.e., subgraph of structural component knowledge..\n",
                 "green", "on_grey", ["bold"]
             ))
-        # complete_graphs = {comp: self.construct_complete_graph({}, [comp])
-        #                   for comp in classified_components.keys() if classified_components[comp][0]}
+        complete_graphs = {comp: self.construct_complete_graph({}, [comp])
+                           for comp in classified_components.keys() if classified_components[comp][0]}
         explicitly_considered_links = {}
-        # self.visualize_initial_graph(anomalous_paths, complete_graphs, explicitly_considered_links)
+        self.visualize_initial_graph(anomalous_paths, complete_graphs, explicitly_considered_links)
 
         # load potential previous paths from session files
         already_found_fault_paths = self.load_already_found_fault_paths()
@@ -796,10 +796,10 @@ class IsolateProblemCheckEffectiveRadius(smach.State):
                         fault_paths.append([k])
 
             anomalous_paths[anomalous_comp] = fault_paths
-        # visualizations = self.gen_causal_graph_visualizations(
-        #     anomalous_paths, complete_graphs, explicitly_considered_links
-        # )
-        # self.data_provider.provide_causal_graph_visualizations(visualizations)
+        visualizations = self.gen_causal_graph_visualizations(
+            anomalous_paths, complete_graphs, explicitly_considered_links
+        )
+        self.data_provider.provide_causal_graph_visualizations(visualizations)
         remaining_error_code_instances = util.load_error_code_instances()
         if self.verbose:
             print("REMAINING error codes:", remaining_error_code_instances)

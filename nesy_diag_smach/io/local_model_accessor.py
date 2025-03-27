@@ -44,7 +44,7 @@ class LocalModelAccessor(ModelAccessor):
                 print("loading trained model:", trained_model_file)
             model_meta_info = {
                 "normalization_method": "z_norm",
-                "model_id": "keras_univariate_ts_classification_model_001"
+                "model_id": "42qq#34"
             }
             return keras.models.load_model(trained_model_file), model_meta_info
         except OSError as e:

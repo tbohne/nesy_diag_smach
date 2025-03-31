@@ -3,9 +3,7 @@
 ![unstable](https://img.shields.io/badge/stability-unstable-orange)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Neuro-symbolic diagnosis state machine (generalizing [**vehicle_diag_smach**](https://github.com/tbohne/vehicle_diag_smach)).
-
-## State Machine Architecture
+## State Machine Architecture (generalizing [**vehicle_diag_smach**](https://github.com/tbohne/vehicle_diag_smach))
 
 ![](img/nesy_diag_smach_v1.svg)
 

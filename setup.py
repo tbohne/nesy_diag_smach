@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 URL = 'https://github.com/tbohne/nesy_diag_smach'
 
 with open('requirements.txt') as f:
